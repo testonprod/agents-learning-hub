@@ -1,0 +1,1990 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Microsoft 365 Agents SDK Atlas · every module and how they connect</title>
+<script>
+  (function () {
+    var p = localStorage.getItem("apple-html-theme") || "auto";
+    var dark = p === "dark" || (p === "auto" && matchMedia("(prefers-color-scheme: dark)").matches);
+    document.documentElement.dataset.theme = dark ? "dark" : "light";
+  })();
+</script>
+<style>
+/* apple-html design system: Apple-style single-file HTML pages.
+   Light/dark via :root[data-theme]. Tokens first, then components. */
+:root {
+  --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Helvetica Neue", "Segoe UI", system-ui, sans-serif;
+  --mono: "SF Mono", ui-monospace, Menlo, "Cascadia Code", monospace;
+  --bg: #fbfbfd; --bg-2: #f5f5f7; --card: #ffffff; --card-2: #f5f5f7;
+  --fg: #1d1d1f; --fg-2: #6e6e73; --fg-3: #86868b;
+  --line: rgba(0,0,0,.08); --line-2: rgba(0,0,0,.14);
+  --blue: #0071e3; --indigo: #5e5ce6; --purple: #af52de; --teal: #30b0c7;
+  --green: #248a3d; --green-2: #34c759; --orange: #ff9f0a; --red: #ff3b30; --gray: #8e8e93;
+  --shadow: 0 1px 2px rgba(0,0,0,.04), 0 8px 28px rgba(0,0,0,.06);
+  --shadow-lg: 0 2px 6px rgba(0,0,0,.05), 0 22px 60px rgba(0,0,0,.10);
+  --nav: rgba(251,251,253,.72); --code-bg: #f5f5f7;
+  --r-lg: 22px; --r-md: 16px; --r-sm: 10px;
+}
+:root[data-theme="dark"] {
+  --bg: #000; --bg-2: #0d0d0f; --card: #1c1c1e; --card-2: #2c2c2e;
+  --fg: #f5f5f7; --fg-2: #a1a1a6; --fg-3: #8e8e93;
+  --line: rgba(255,255,255,.10); --line-2: rgba(255,255,255,.18);
+  --blue: #2997ff; --indigo: #7d7aff; --purple: #bf5af2; --teal: #40c8e0;
+  --green: #30d158; --green-2: #30d158; --orange: #ff9f0a; --red: #ff453a;
+  --shadow: 0 1px 2px rgba(0,0,0,.5), 0 8px 28px rgba(0,0,0,.35);
+  --shadow-lg: 0 2px 6px rgba(0,0,0,.5), 0 22px 60px rgba(0,0,0,.5);
+  --nav: rgba(22,22,23,.72); --code-bg: #111113;
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; scroll-padding-top: 72px; -webkit-text-size-adjust: 100%; }
+body { margin: 0; font-family: var(--font); background: var(--bg); color: var(--fg); font-size: 17px; line-height: 1.47; letter-spacing: -.022em; -webkit-font-smoothing: antialiased; }
+a { color: var(--blue); text-decoration: none; }
+a:hover { text-decoration: underline; }
+code, .mono { font-family: var(--mono); font-size: .86em; letter-spacing: 0; }
+:focus-visible { outline: 3px solid color-mix(in srgb, var(--blue) 60%, transparent); outline-offset: 2px; border-radius: 6px; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } *, *::before { animation: none !important; transition: none !important; } }
+
+/* nav */
+.nav { position: sticky; top: 0; z-index: 50; background: var(--nav); backdrop-filter: saturate(180%) blur(20px); -webkit-backdrop-filter: saturate(180%) blur(20px); border-bottom: 1px solid var(--line); }
+.nav-inner { max-width: 1120px; margin: 0 auto; padding: 0 22px; height: 52px; display: flex; align-items: center; gap: 18px; }
+.brand { font-weight: 600; font-size: 15px; display: flex; align-items: center; gap: 8px; white-space: nowrap; color: var(--fg); }
+.brand-dot { width: 22px; height: 22px; border-radius: 6px; background: linear-gradient(135deg, #0a84ff, #af52de); display: grid; place-items: center; color: #fff; font-size: 9px; font-weight: 700; letter-spacing: 0; }
+.nav-links { display: flex; gap: 2px; overflow-x: auto; scrollbar-width: none; flex: 1; }
+.nav-links::-webkit-scrollbar { display: none; }
+.nav-links a { color: var(--fg-2); font-size: 13px; padding: 6px 10px; border-radius: 980px; white-space: nowrap; }
+.nav-links a:hover { color: var(--fg); text-decoration: none; }
+.nav-links a.active { color: var(--fg); background: var(--card-2); }
+
+/* segmented control */
+.seg { display: inline-flex; background: var(--card-2); border-radius: 9px; padding: 2px; gap: 2px; }
+.seg button { font: inherit; font-size: 13px; letter-spacing: -.01em; border: 0; background: transparent; color: var(--fg); padding: 5px 14px; border-radius: 7px; cursor: pointer; white-space: nowrap; }
+.seg button[aria-pressed="true"] { background: var(--card); box-shadow: 0 1px 3px rgba(0,0,0,.12), 0 0 0 .5px rgba(0,0,0,.04); font-weight: 500; }
+:root[data-theme="dark"] .seg button[aria-pressed="true"] { background: #636366; }
+.seg.small button { padding: 3px 10px; font-size: 12px; }
+
+/* layout */
+.wrap { max-width: 1120px; margin: 0 auto; padding: 0 22px; }
+section { padding: 96px 0 16px; }
+.eyebrow { font-size: 15px; font-weight: 600; color: var(--blue); letter-spacing: -.01em; margin: 0 0 8px; }
+h1, h2, h3 { letter-spacing: -.028em; margin: 0; }
+h2 { font-size: clamp(32px, 5vw, 48px); line-height: 1.08; font-weight: 700; }
+h3 { font-size: 21px; font-weight: 600; line-height: 1.2; }
+.lede { font-size: clamp(19px, 2.2vw, 22px); color: var(--fg-2); max-width: 780px; margin: 14px 0 0; line-height: 1.4; letter-spacing: -.02em; }
+.sec-head { margin-bottom: 36px; }
+
+/* hero */
+.hero { padding: 104px 0 32px; text-align: center; }
+.hero h1 { font-size: clamp(44px, 8vw, 84px); line-height: 1.03; font-weight: 700; letter-spacing: -.045em; }
+.grad { background: linear-gradient(92deg, #0a84ff 0%, #5e5ce6 35%, #af52de 62%, #30d158 100%); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.hero .lede { margin: 22px auto 0; }
+.pills { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-top: 30px; }
+.pill { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; padding: 7px 14px; border-radius: 980px; background: var(--card); box-shadow: var(--shadow); color: var(--fg); }
+.pill .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green-2); box-shadow: 0 0 0 4px color-mix(in srgb, var(--green-2) 22%, transparent); }
+.stats { display: grid; grid-template-columns: repeat(6, 1fr); gap: 1px; margin: 60px auto 0; background: var(--line); border-radius: var(--r-lg); overflow: hidden; box-shadow: var(--shadow); max-width: 1020px; }
+.stat { background: var(--card); padding: 22px 10px; text-align: center; }
+.stat b { display: block; font-size: 34px; font-weight: 700; letter-spacing: -.035em; line-height: 1.1; }
+.stat span { font-size: 13px; color: var(--fg-2); }
+@media (max-width: 820px) { .stats { grid-template-columns: repeat(3, 1fr); } }
+
+/* cards */
+.card { background: var(--card); border-radius: var(--r-lg); box-shadow: var(--shadow); padding: 28px; }
+.grid-2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
+.grid-3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; }
+@media (max-width: 900px) { .grid-3 { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 680px) { .grid-2, .grid-3 { grid-template-columns: 1fr; } }
+.muted { color: var(--fg-2); }
+.small { font-size: 14px; }
+.tag { display: inline-block; font-size: 12px; font-weight: 600; padding: 2px 9px; border-radius: 980px; background: var(--card-2); color: var(--fg-2); letter-spacing: -.005em; white-space: nowrap; }
+.tag.blue { background: color-mix(in srgb, var(--blue) 14%, transparent); color: var(--blue); }
+.tag.green { background: color-mix(in srgb, var(--green) 16%, transparent); color: var(--green); }
+.tag.orange { background: color-mix(in srgb, var(--orange) 18%, transparent); color: color-mix(in srgb, var(--orange) 62%, var(--fg)); }
+.tag.red { background: color-mix(in srgb, var(--red) 14%, transparent); color: var(--red); }
+.tag.purple { background: color-mix(in srgb, var(--purple) 14%, transparent); color: var(--purple); }
+
+/* diagram */
+.diagram-card { padding: 18px; }
+.diagram-bar { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; padding: 4px 6px 12px; }
+.legend { display: flex; gap: 16px; flex-wrap: wrap; font-size: 13px; color: var(--fg-2); }
+.legend i { display: inline-block; width: 24px; height: 0; border-top: 2px solid var(--fg-3); vertical-align: middle; margin-right: 6px; }
+.legend i.flow { border-top: 2.5px dashed var(--blue); }
+.legend i.dash { border-top-style: dashed; }
+.legend i.ui { border-top: 2px dashed var(--purple); }
+.scroll-x { overflow-x: auto; }
+svg.arch { width: 100%; min-width: 760px; height: auto; display: block; user-select: none; }
+.arch .zone text { font: 600 11.5px var(--font); letter-spacing: .06em; }
+.arch .node { cursor: pointer; outline: none; }
+.arch .node rect.box { fill: var(--card); stroke: var(--line-2); stroke-width: 1; transition: stroke .2s; }
+.arch .node:hover rect.box, .arch .node:focus-visible rect.box { stroke: var(--blue); stroke-width: 1.5; }
+.arch .node.sel rect.box { stroke: var(--blue); stroke-width: 2.5; }
+.arch .node .t { font: 600 14px var(--font); fill: var(--fg); letter-spacing: -.01em; }
+.arch .node .s { font: 400 11.5px var(--font); fill: var(--fg-2); }
+.arch .edge { fill: none; stroke: var(--fg-3); stroke-width: 1.6; }
+.arch .edge.dash { stroke-dasharray: 5 5; }
+.arch .edge.flow { stroke: var(--blue); stroke-width: 2.6; stroke-dasharray: 9 7; animation: flow 1.1s linear infinite; }
+.arch .edge.ui { stroke: var(--purple); stroke-dasharray: 6 5; stroke-width: 1.8; }
+@keyframes flow { to { stroke-dashoffset: -32; } }
+.arch .lbl rect { fill: var(--card); stroke: var(--line-2); }
+.arch .lbl text { font: 500 11px var(--font); fill: var(--fg-2); }
+.arch .lbl.blue text { fill: var(--blue); }
+.arch .lbl.purple text { fill: var(--purple); }
+.detail { margin-top: 16px; display: grid; grid-template-columns: 1fr 1.25fr; gap: 28px; background: var(--card-2); border-radius: var(--r-md); padding: 24px; }
+@media (max-width: 780px) { .detail { grid-template-columns: 1fr; } }
+.detail h3 { margin: 6px 0 8px; font-size: 24px; }
+.detail p { margin: 0 0 10px; color: var(--fg-2); font-size: 15px; }
+.files { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
+
+/* key/value */
+.kv { display: grid; grid-template-columns: max-content minmax(0, 1fr) auto; font-size: 14px; }
+.kv > div { padding: 9px 0; border-bottom: 1px solid var(--line); }
+.kv > div:nth-last-child(-n+3) { border-bottom: 0; }
+.kv .k { color: var(--fg-2); padding-right: 18px; white-space: nowrap; }
+.kv .v { font-family: var(--mono); font-size: 12.5px; overflow-wrap: anywhere; letter-spacing: 0; }
+.kv .v.text { font-family: var(--font); font-size: 14px; letter-spacing: -.01em; }
+.kv .c { padding-left: 8px; text-align: right; }
+.copy { font: inherit; font-size: 12px; border: 0; background: transparent; color: var(--blue); cursor: pointer; padding: 2px 7px; border-radius: 6px; }
+.copy:hover { background: color-mix(in srgb, var(--blue) 12%, transparent); }
+.copy.done { color: var(--green); }
+.secret { color: var(--fg-3); font-family: var(--font) !important; font-style: italic; font-size: 13px !important; }
+
+/* lifecycle */
+.life-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 18px; }
+.steps { display: grid; }
+.step { display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: 16px; padding: 14px 16px; border-radius: var(--r-md); cursor: pointer; transition: background .2s, box-shadow .2s; position: relative; }
+.step::before { content: ""; position: absolute; left: 37px; top: 58px; bottom: -14px; width: 2px; background: var(--line); }
+.step:last-child::before { display: none; }
+.step .n { width: 44px; height: 44px; border-radius: 50%; background: var(--card-2); color: var(--fg-2); display: grid; place-items: center; font-weight: 600; font-size: 16px; position: relative; z-index: 1; transition: background .25s, color .25s, transform .25s; }
+.step h4 { margin: 2px 0 2px; font-size: 17px; font-weight: 600; letter-spacing: -.02em; }
+.step p { margin: 0; color: var(--fg-2); font-size: 15px; }
+.step .chips { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+.step .chips code { background: var(--card-2); padding: 3px 8px; border-radius: 6px; font-size: 12px; }
+.step.on { background: var(--card); box-shadow: var(--shadow); }
+.step.on .chips code { background: var(--bg-2); }
+.step.on .n { background: var(--blue); color: #fff; transform: scale(1.06); }
+.step.done .n { background: color-mix(in srgb, var(--blue) 16%, transparent); color: var(--blue); }
+.btn { font: inherit; font-size: 14px; border: 0; border-radius: 980px; padding: 8px 18px; cursor: pointer; background: var(--blue); color: #fff; }
+.btn.ghost { background: var(--card-2); color: var(--fg); }
+.btn:disabled { opacity: .4; cursor: default; }
+.ctrl { display: flex; gap: 8px; align-items: center; }
+
+/* phases */
+.phases { display: grid; gap: 22px; }
+.phase { display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: 20px; }
+@media (max-width: 600px) { .phase { grid-template-columns: 1fr; } }
+.phase .badge { width: 64px; height: 64px; border-radius: 18px; display: grid; place-items: center; font-size: 26px; font-weight: 700; color: #fff; box-shadow: var(--shadow); letter-spacing: -.03em; position: sticky; top: 76px; }
+.phase .card { padding: 26px 28px; }
+.phase .top { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
+.phase h3 { font-size: 26px; }
+.phase .why { color: var(--fg-2); margin: 6px 0 14px; font-size: 16px; }
+.phase ul { margin: 0; padding-left: 20px; font-size: 15px; }
+.phase li { margin: 5px 0; }
+.phase li::marker { color: var(--fg-3); }
+.result { margin-top: 16px; display: flex; gap: 8px; flex-wrap: wrap; }
+.snag { margin-top: 16px; border-radius: var(--r-sm); padding: 12px 14px; background: color-mix(in srgb, var(--orange) 9%, var(--card)); border: 1px solid color-mix(in srgb, var(--orange) 28%, transparent); font-size: 14px; }
+.snag b { color: color-mix(in srgb, var(--orange) 62%, var(--fg)); }
+details { margin-top: 14px; }
+details summary { cursor: pointer; color: var(--blue); font-size: 14px; list-style: none; display: inline-flex; align-items: center; gap: 6px; }
+details summary::-webkit-details-marker { display: none; }
+details summary::before { content: "›"; display: inline-block; transition: transform .2s; font-size: 18px; line-height: 1; }
+details[open] summary::before { transform: rotate(90deg); }
+pre { background: var(--code-bg); border-radius: var(--r-sm); padding: 14px 16px; overflow-x: auto; font-family: var(--mono); font-size: 12.5px; line-height: 1.6; margin: 10px 0 0; letter-spacing: 0; position: relative; border: 1px solid var(--line); }
+pre .copy { position: absolute; top: 8px; right: 8px; background: var(--card); box-shadow: var(--shadow); }
+.cm { color: var(--fg-3); }
+
+/* gallery */
+.gallery { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 32px; align-items: start; }
+@media (max-width: 900px) { .gallery { grid-template-columns: 1fr; } }
+.shot { background: var(--card); border-radius: var(--r-lg); box-shadow: var(--shadow-lg); overflow: hidden; border: 1px solid var(--line); }
+.shot .chrome { height: 34px; display: flex; align-items: center; gap: 7px; padding: 0 14px; border-bottom: 1px solid var(--line); background: var(--card-2); }
+.shot .chrome i { width: 11px; height: 11px; border-radius: 50%; display: inline-block; }
+.shot .chrome span { margin-left: 10px; font-family: var(--mono); font-size: 11.5px; color: var(--fg-2); }
+.shot img { width: 100%; height: auto; display: block; }
+.feat { display: grid; gap: 14px; margin: 20px 0 0; padding: 0; list-style: none; }
+.feat li { display: grid; grid-template-columns: 30px 1fr; gap: 12px; font-size: 15px; }
+.feat .ic { width: 30px; height: 30px; border-radius: 8px; display: grid; place-items: center; font-size: 12px; color: #fff; font-weight: 700; }
+.feat b { display: block; font-weight: 600; letter-spacing: -.015em; }
+.feat span { color: var(--fg-2); font-size: 14px; }
+
+/* misc */
+.lesson { display: grid; gap: 8px; align-content: start; }
+.lesson .p { font-weight: 600; font-size: 16px; letter-spacing: -.015em; }
+.lesson .f { font-size: 14px; color: var(--fg-2); }
+.check { list-style: none; padding: 0; margin: 0; display: grid; gap: 12px; }
+.check li { display: grid; grid-template-columns: 22px 1fr; gap: 12px; font-size: 15px; align-items: start; }
+.check .bx { width: 20px; height: 20px; border-radius: 6px; border: 1.5px solid var(--line-2); margin-top: 2px; display: grid; place-items: center; font-size: 12px; color: #fff; }
+.check .bx.ok { background: var(--green-2); border-color: var(--green-2); }
+.callout { border-radius: var(--r-md); padding: 18px 20px; display: grid; grid-template-columns: 28px 1fr; gap: 12px; font-size: 15px; }
+.callout.warn { background: color-mix(in srgb, var(--orange) 10%, var(--card)); border: 1px solid color-mix(in srgb, var(--orange) 30%, transparent); }
+.callout .ic { width: 28px; height: 28px; border-radius: 50%; background: var(--orange); color: #fff; display: grid; place-items: center; font-weight: 700; }
+.ref-group h3 { font-size: 17px; margin-bottom: 6px; display: flex; align-items: center; gap: 8px; }
+.ref-group .sw { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+footer { padding: 80px 0 60px; color: var(--fg-3); font-size: 13px; text-align: center; }
+footer a { color: var(--fg-2); }
+.toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(20px); background: rgba(29,29,31,.92); color: #fff; padding: 9px 16px; border-radius: 980px; font-size: 13px; opacity: 0; transition: .25s; pointer-events: none; z-index: 99; }
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+/* small screens */
+.step .chips code { overflow-wrap: anywhere; max-width: 100%; }
+.nav-links { mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent); -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent); padding-right: 24px; }
+@media (max-width: 600px) {
+  .card { padding: 20px; }
+  .kv { grid-template-columns: minmax(0, 1fr) auto; }
+  .kv .k { grid-column: 1 / -1; padding: 10px 0 0; border-bottom: 0 !important; white-space: normal; font-size: 12.5px; }
+  .kv .v { padding-top: 2px; }
+  .kv .c { padding-top: 2px; }
+  .brand span:last-child { display: none; }
+  .phase .badge { position: static; width: 48px; height: 48px; font-size: 20px; border-radius: 14px; }
+}
+
+/* ===== guides, steps, sequence diagrams, worksheets ===== */
+
+/* ---------- build guide additions ---------- */
+.path { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin: 4px 0 14px; font-size: 13px; }
+.path span { background: var(--card-2); padding: 3px 10px; border-radius: 980px; color: var(--fg); white-space: nowrap; }
+.path i { color: var(--fg-3); font-style: normal; }
+.do { counter-reset: d; list-style: none; padding: 0; margin: 0; display: grid; gap: 10px; }
+.do li { counter-increment: d; display: grid; grid-template-columns: 26px minmax(0, 1fr); gap: 12px; font-size: 15px; }
+.do li::before { content: counter(d); width: 26px; height: 26px; border-radius: 50%; background: color-mix(in srgb, var(--blue) 14%, transparent); color: var(--blue); font-size: 13px; font-weight: 600; display: grid; place-items: center; margin-top: 1px; }
+.cols { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 22px; margin-top: 6px; }
+@media (max-width: 860px) { .cols { grid-template-columns: 1fr; } }
+.box { background: var(--card-2); border-radius: var(--r-md); padding: 16px 18px; font-size: 14px; }
+.box h4 { margin: 0 0 8px; font-size: 13px; text-transform: uppercase; letter-spacing: .05em; color: var(--fg-2); font-weight: 600; }
+.box ul { margin: 0; padding-left: 18px; }
+.box li { margin: 4px 0; }
+.box + .box { margin-top: 12px; }
+.why-box { border-left: 3px solid var(--blue); background: color-mix(in srgb, var(--blue) 6%, var(--card)); padding: 12px 16px; border-radius: 0 var(--r-sm) var(--r-sm) 0; font-size: 15px; margin: 4px 0 16px; }
+.why-box b { color: var(--blue); }
+.tip { margin-top: 14px; border-radius: var(--r-sm); padding: 12px 14px; background: color-mix(in srgb, var(--orange) 9%, var(--card)); border: 1px solid color-mix(in srgb, var(--orange) 28%, transparent); font-size: 14px; }
+.tip b { color: color-mix(in srgb, var(--orange) 62%, var(--fg)); }
+.fields { width: 100%; border-collapse: collapse; font-size: 14px; margin-top: 4px; }
+.fields td { padding: 8px 10px 8px 0; border-bottom: 1px solid var(--line); vertical-align: top; }
+.fields tr:last-child td { border-bottom: 0; }
+.fields td:first-child { color: var(--fg-2); white-space: nowrap; width: 1%; }
+
+/* why cards */
+.why-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; }
+@media (max-width: 900px) { .why-grid { grid-template-columns: 1fr; } }
+.why-card { display: grid; gap: 10px; align-content: start; }
+.why-card .ic { width: 44px; height: 44px; border-radius: 12px; display: grid; place-items: center; color: #fff; font-weight: 700; font-size: 18px; }
+.why-card h3 { font-size: 22px; }
+.why-card .q { font-size: 15px; color: var(--fg-2); margin: 0; }
+.why-card .a { font-size: 15px; margin: 0; }
+.why-card .where { font-size: 13px; color: var(--fg-2); border-top: 1px solid var(--line); padding-top: 10px; margin-top: 4px; }
+
+/* sequence diagram */
+.seq-wrap { display: grid; grid-template-columns: minmax(0, 1fr) 330px; gap: 22px; align-items: start; }
+@media (max-width: 1000px) { .seq-wrap { grid-template-columns: 1fr; } }
+svg.seq { width: 100%; min-width: 760px; height: auto; display: block; user-select: none; }
+.seq .lane-head rect { fill: var(--card); stroke: var(--line-2); }
+.seq .lane-head text { font: 600 12.5px var(--font); fill: var(--fg); }
+.seq .life { stroke: var(--line-2); stroke-dasharray: 3 5; }
+.seq .grp rect { fill: var(--card-2); }
+.seq .grp text { font: 600 11px var(--font); fill: var(--fg-2); letter-spacing: .06em; }
+.seq .msg { cursor: pointer; }
+.seq .msg .hit { fill: transparent; }
+.seq .msg line { stroke: var(--fg-3); stroke-width: 1.5; transition: stroke .2s, stroke-width .2s; }
+.seq .msg.resp line { stroke-dasharray: 5 4; }
+.seq .msg text.l { font: 500 11.5px var(--font); fill: var(--fg-2); transition: fill .2s; }
+.seq .msg circle { fill: var(--card-2); stroke: var(--line-2); transition: fill .2s; }
+.seq .msg text.n { font: 600 10.5px var(--font); fill: var(--fg-2); }
+.seq .msg:hover text.l { fill: var(--fg); }
+.seq .msg.on line { stroke: var(--blue); stroke-width: 2.6; }
+.seq .msg.on text.l { fill: var(--fg); font-weight: 600; }
+.seq .msg.on circle { fill: var(--blue); stroke: var(--blue); }
+.seq .msg.on text.n { fill: #fff; }
+.seq .msg.ui line { stroke: var(--purple); }
+.seq .msg.ui.on line { stroke: var(--purple); }
+.seq .msg.ui.on circle { fill: var(--purple); stroke: var(--purple); }
+.seq-panel { position: sticky; top: 76px; }
+.seq-panel .n { font-size: 13px; color: var(--fg-2); font-weight: 600; }
+.seq-panel h3 { margin: 6px 0 10px; font-size: 22px; }
+.seq-panel p { margin: 0 0 12px; font-size: 15px; color: var(--fg-2); }
+.seq-panel .lanes { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+.seq-panel .where { font-size: 13px; border-top: 1px solid var(--line); padding-top: 10px; color: var(--fg-2); }
+.seq-panel .where b { color: var(--fg); font-weight: 600; }
+
+/* worksheet */
+.ws { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 14px; }
+.ws th { text-align: left; font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--fg-2); font-weight: 600; padding: 10px 14px; border-bottom: 1px solid var(--line-2); }
+.ws td { padding: 12px 14px; border-bottom: 1px solid var(--line); vertical-align: top; }
+.ws tr:last-child td { border-bottom: 0; }
+.ws td:first-child { font-weight: 600; white-space: nowrap; }
+.ws code { background: var(--card-2); padding: 2px 6px; border-radius: 6px; }
+@media (max-width: 700px) { .ws thead { display: none; } .ws tr { display: grid; padding: 10px 0; border-bottom: 1px solid var(--line); } .ws td { border: 0; padding: 3px 14px; } }
+.seq .lbl rect { fill: var(--card); stroke: none; }
+.seq .msg.on .lbl rect { fill: color-mix(in srgb, var(--blue) 10%, var(--card)); }
+.seq .msg.ui.on .lbl rect { fill: color-mix(in srgb, var(--purple) 10%, var(--card)); }
+/* sequence: panel above, diagram full width */
+.seq-wrap { grid-template-columns: 1fr !important; gap: 14px; }
+.seq-panel { position: sticky; top: 60px; z-index: 3; order: -1; }
+.seq-panel .card { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); gap: 6px 28px; padding: 18px 22px !important; box-shadow: var(--shadow-lg); border: 1px solid var(--line); }
+.seq-panel .card .n, .seq-panel .card h3, .seq-panel .card .lanes { grid-column: 1; }
+.seq-panel .card p, .seq-panel .card .where { grid-column: 2; }
+.seq-panel .card p { grid-row: 1 / span 2; align-self: start; }
+.seq-panel .card .where { grid-row: 3; }
+.seq-panel h3 { margin: 2px 0 6px !important; font-size: 20px !important; }
+@media (max-width: 760px) { .seq-panel .card { grid-template-columns: 1fr; } .seq-panel .card p, .seq-panel .card .where { grid-column: 1; grid-row: auto; } }
+svg.seq { min-width: 860px; }
+.seq .msg text.l { font-size: 12.5px; }
+.seq .lane-head text { font-size: 13px; }
+.phase > * , .cols > * { min-width: 0; }
+@media (max-width: 600px) {
+  .phase { grid-template-columns: minmax(0, 1fr); }
+  .life-head .seg { max-width: 100%; overflow-x: auto; scrollbar-width: none; }
+  .fields td:first-child { white-space: normal; }
+}
+.phase code, .why-box code, .tip code, .ws code, .box code { overflow-wrap: anywhere; }
+@media (max-width: 600px) {
+  .fields tr { display: block; border-bottom: 1px solid var(--line); padding: 6px 0; }
+  .fields td { display: block; width: auto !important; border: 0 !important; padding: 2px 0; }
+}
+.seq .msg { outline: none; }
+.seq .msg:focus-visible .hit { fill: color-mix(in srgb, var(--blue) 7%, transparent); }
+
+/* ---------- extra tokens ---------- */
+:root { --mint: #00a39b; --pink: #e3175a; }
+:root[data-theme="dark"] { --mint: #63e6e2; --pink: #ff375f; }
+
+.sub-h { margin: 44px 0 16px; font-size: 24px; letter-spacing: -.02em; }
+.mchip { font: inherit; font-size: 12.5px; border: 0; cursor: pointer; padding: 4px 10px; border-radius: 999px; background: color-mix(in srgb, var(--c, var(--blue)) 13%, transparent); color: color-mix(in srgb, var(--c, var(--blue)) 80%, var(--fg)); font-weight: 500; letter-spacing: -.01em; white-space: nowrap; transition: transform .15s, background .15s; }
+.mchip:hover, .mchip:focus-visible { background: color-mix(in srgb, var(--c, var(--blue)) 24%, transparent); outline: none; transform: translateY(-1px); }
+.chips-row { display: flex; flex-wrap: wrap; gap: 6px; }
+.tcode { font: 500 12px var(--mono); background: var(--card-2); color: var(--fg); padding: 3px 8px; border-radius: 7px; white-space: nowrap; }
+.prev { font-size: 11px; font-weight: 600; color: var(--orange); border: 1px solid color-mix(in srgb, var(--orange) 45%, transparent); border-radius: 999px; padding: 1px 7px; margin-left: 6px; vertical-align: 2px; letter-spacing: 0; }
+
+/* ---------- problems / is-isn't ---------- */
+.prob .ic { width: 44px; height: 44px; border-radius: 12px; display: grid; place-items: center; color: #fff; font-size: 20px; font-weight: 700; margin-bottom: 14px; }
+.prob h3 { margin: 0 0 8px; font-size: 20px; letter-spacing: -.02em; }
+.prob p { margin: 0 0 12px; color: var(--fg-2); font-size: 15px; }
+.prob .ans { font-size: 15px; border-top: 1px solid var(--line); padding-top: 12px; margin-bottom: 12px; }
+.isnt { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; }
+.isnt h3 { margin: 0 0 14px; }
+.check .bx.no { background: var(--red); border-color: var(--red); }
+@media (max-width: 680px) { .isnt { grid-template-columns: 1fr; } }
+
+/* ---------- atom ---------- */
+svg.atom { width: 100%; min-width: 860px; height: auto; display: block; user-select: none; }
+.atom .ring { fill: none; stroke: var(--line-2); stroke-dasharray: 2 6; }
+.atom .ring-lbl { font: 600 10.5px var(--font); letter-spacing: .08em; fill: var(--fg-3); }
+.atom .core-glow { fill: color-mix(in srgb, var(--blue) 7%, transparent); stroke: color-mix(in srgb, var(--blue) 30%, transparent); }
+.atom .an { cursor: pointer; outline: none; }
+.atom .an rect { fill: var(--card); stroke: color-mix(in srgb, var(--c) 45%, var(--line-2)); stroke-width: 1.2; transition: stroke-width .2s, opacity .25s, fill .2s; }
+.atom .an text { font: 600 12.5px var(--font); fill: var(--fg); letter-spacing: -.01em; transition: opacity .25s; pointer-events: none; }
+.atom .an .dot { fill: var(--c); }
+.atom .an.r0 rect { fill: color-mix(in srgb, var(--c) 14%, var(--card)); stroke-width: 1.6; }
+.atom .an.r0 text { font-size: 14px; font-weight: 700; }
+.atom .an:hover rect, .atom .an:focus-visible rect { stroke: var(--c); stroke-width: 2.2; }
+.atom .an.sel rect { stroke: var(--c); stroke-width: 3; fill: color-mix(in srgb, var(--c) 18%, var(--card)); }
+.atom .an.lit rect { stroke: var(--c); stroke-width: 2; }
+.atom.focus .an:not(.sel):not(.lit) { opacity: .28; }
+.atom .ae { fill: none; stroke: var(--fg-3); stroke-width: 1; opacity: .22; }
+.atom .ae.hot { stroke: var(--c); stroke-width: 2.2; opacity: .9; stroke-dasharray: 7 6; animation: flow 1.4s linear infinite; }
+.legend .lr { display: inline-flex; align-items: center; gap: 6px; }
+.legend .lr b { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+
+/* module detail panel */
+.mod-detail { grid-template-columns: 1.1fr 1fr; }
+.mod-detail > div { min-width: 0; }
+@media (max-width: 780px) { .mod-detail { grid-template-columns: 1fr; } }
+.mod-detail .top { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.mod-detail h4 { margin: 14px 0 8px; font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--fg-2); }
+.mod-detail h4:first-child { margin-top: 0; }
+.mod-detail .note { font-size: 13.5px; color: var(--fg-2); margin: 8px 0 0; }
+.mod-detail .doc { font-size: 14px; display: inline-block; margin-top: 14px; }
+.pkrows { display: grid; gap: 6px; }
+.pkrows div { display: grid; grid-template-columns: 56px 1fr; gap: 10px; font-size: 13px; align-items: baseline; }
+.pkrows span { color: var(--fg-2); font-weight: 600; }
+.pkrows code { font: 12px var(--mono); overflow-wrap: anywhere; }
+.pkrows .na { color: var(--fg-3); font-family: var(--font); }
+
+/* ---------- layer stack ---------- */
+.stack { display: grid; gap: 10px; position: relative; }
+.band { display: grid; grid-template-columns: 54px 270px minmax(0, 1fr); gap: 18px; align-items: center; background: var(--card); border-radius: var(--r-md); box-shadow: var(--shadow); padding: 16px 20px; border-left: 4px solid var(--c); }
+.band .no { font: 700 13px var(--mono); color: var(--c); }
+.band h3 { margin: 0 0 4px; font-size: 17px; letter-spacing: -.015em; }
+.band p { margin: 0; font-size: 13.5px; color: var(--fg-2); }
+.band .chips-row { gap: 6px; }
+.stack-arrows { display: flex; justify-content: space-between; font-size: 13px; color: var(--fg-2); margin: 0 4px 10px; }
+@media (max-width: 860px) { .band { grid-template-columns: 40px 1fr; } .band .chips-row { grid-column: 1 / -1; } }
+
+/* ---------- turn sequence: full-width svg, panel on top ---------- */
+#turn .seq-wrap { grid-template-columns: 1fr; gap: 14px; }
+#turn .seq-panel { position: sticky; top: 60px; z-index: 3; order: -1; }
+#turn .seq-panel .card { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr); gap: 6px 28px; padding: 18px 22px; box-shadow: var(--shadow-lg); border: 1px solid var(--line); }
+#turn .seq-panel .card .n, #turn .seq-panel .card h3, #turn .seq-panel .card .lanes { grid-column: 1; }
+#turn .seq-panel .card p, #turn .seq-panel .card .where { grid-column: 2; }
+#turn .seq-panel .card p { grid-row: 1 / span 2; align-self: start; margin: 0 0 8px; }
+#turn .seq-panel .card .where { grid-row: 3; display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+#turn svg.seq { min-width: 900px; }
+@media (max-width: 760px) { #turn .seq-panel .card { grid-template-columns: 1fr; } #turn .seq-panel .card p, #turn .seq-panel .card .where { grid-column: 1; grid-row: auto; } }
+
+/* ---------- routing ---------- */
+.tiers { display: grid; gap: 8px; margin-top: 14px; }
+.tier { display: grid; grid-template-columns: 34px 1fr; gap: 12px; align-items: center; padding: 10px 12px; border-radius: 12px; background: color-mix(in srgb, var(--blue) calc(var(--w) * 1%), var(--card-2)); }
+.tier .b { width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center; background: var(--blue); color: #fff; font-weight: 700; font-size: 14px; }
+.tier b { display: block; font-size: 15px; letter-spacing: -.01em; }
+.tier span { font-size: 13px; color: var(--fg-2); }
+.ranks { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 14px; }
+.rank { background: var(--card-2); border-radius: 12px; padding: 12px; }
+.rank code { font: 600 12px var(--mono); display: block; margin-bottom: 4px; overflow-wrap: anywhere; }
+.rank b { font-size: 22px; letter-spacing: -.02em; display: block; }
+.rank span { font-size: 12.5px; color: var(--fg-2); }
+.pipe { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 14px; }
+.pipe .p { font-size: 12.5px; font-weight: 600; padding: 7px 11px; border-radius: 9px; background: color-mix(in srgb, var(--c) 13%, transparent); color: color-mix(in srgb, var(--c) 78%, var(--fg)); }
+.pipe i { color: var(--fg-3); font-style: normal; }
+.code-card pre { margin: 0; background: var(--code-bg); border-radius: var(--r-md); padding: 18px 20px; font: 12.5px/1.6 var(--mono); overflow-x: auto; white-space: pre; color: var(--fg); }
+.code-card .life-head h3 { margin: 0; }
+.code-card .cm { color: var(--fg-3); }
+
+/* ---------- state ---------- */
+.state-flow { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0; align-items: stretch; }
+.sf { position: relative; background: var(--card); box-shadow: var(--shadow); border-radius: var(--r-md); padding: 18px; margin-right: 28px; cursor: pointer; border-top: 3px solid var(--c); text-align: left; font: inherit; color: inherit; border-left: 0; border-right: 0; border-bottom: 0; }
+.sf:last-child { margin-right: 0; }
+.sf:not(:last-child)::after { content: "⇄"; position: absolute; right: -24px; top: 50%; transform: translateY(-50%); color: var(--fg-3); font-size: 18px; }
+.sf b { display: block; font-size: 16px; letter-spacing: -.015em; }
+.sf span { font-size: 13px; color: var(--fg-2); }
+@media (max-width: 760px) { .state-flow { grid-template-columns: 1fr; gap: 22px; } .sf { margin-right: 0; } .sf:not(:last-child)::after { content: "⇅"; right: 50%; top: auto; bottom: -22px; transform: translateX(50%); } }
+.scope h3 { margin: 0 0 6px; color: var(--c); }
+.scope code { display: block; font: 12px var(--mono); background: var(--card-2); padding: 8px 10px; border-radius: 8px; margin: 8px 0 12px; overflow-wrap: anywhere; }
+.scope p { margin: 0 0 10px; color: var(--fg-2); font-size: 14.5px; }
+.scope ul { margin: 0; padding-left: 18px; font-size: 14px; }
+
+/* ---------- identity ---------- */
+.idc { border-top: 4px solid var(--c); }
+.idc h3 { margin: 0 0 10px; }
+.idc .q { font-size: 15px; font-style: italic; color: var(--fg-2); margin: 0 0 12px; }
+.idc .a { font-size: 15px; margin: 0 0 14px; }
+.kvlist { display: grid; gap: 10px; margin-top: 14px; }
+.kvlist div { display: grid; grid-template-columns: 110px 1fr; gap: 12px; font-size: 14px; }
+.kvlist b { font-weight: 600; }
+.kvlist span { color: var(--fg-2); }
+.rec { font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 999px; }
+.rec.good { color: var(--green); background: color-mix(in srgb, var(--green) 14%, transparent); }
+.rec.ok { color: var(--blue); background: color-mix(in srgb, var(--blue) 14%, transparent); }
+.rec.bad { color: var(--red); background: color-mix(in srgb, var(--red) 12%, transparent); }
+
+/* ---------- brain ---------- */
+.brain-split { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); gap: 20px; }
+.brain-split > .card { min-width: 0; }
+#lifeSeg, #brainSeg { flex-wrap: wrap; max-width: 100%; }
+@media (max-width: 900px) { .brain-split { grid-template-columns: 1fr; } }
+#brainSeg { flex-wrap: wrap; }
+.brain-body { margin-top: 18px; }
+.brain-body h3 { margin: 0 0 12px; font-size: 24px; color: var(--c); letter-spacing: -.02em; }
+.brain-body ol { margin: 0; padding-left: 20px; display: grid; gap: 8px; font-size: 15px; }
+.brain-body li, .plug li { min-width: 0; overflow-wrap: anywhere; }
+.brain-body code, .plug code, .kvlist code, .tf code, .mod code { white-space: normal; overflow-wrap: anywhere; }
+.brain-body .smp { margin-top: 16px; font-size: 13px; color: var(--fg-2); }
+.plug h3 { margin: 0 0 6px; }
+
+/* ---------- channel matrix ---------- */
+.matrix td:not(:first-child), .matrix th:not(:first-child) { text-align: center; }
+.mx { font-size: 13px; font-weight: 600; white-space: nowrap; }
+.mx.y { color: var(--green); }
+.mx.p { color: var(--orange); }
+.mx.r { color: var(--blue); }
+.mx.n { color: var(--fg-3); }
+.mx.t { color: var(--fg-2); font-weight: 500; }
+.mx-legend { display: flex; gap: 16px; flex-wrap: wrap; font-size: 12.5px; color: var(--fg-2); padding: 10px 14px 6px; }
+.tf h3 { margin: 0 0 8px; font-size: 18px; }
+.tf p { margin: 0 0 12px; font-size: 14.5px; color: var(--fg-2); }
+.proop { display: grid; grid-template-columns: 6px 1fr; gap: 14px; margin-top: 14px; }
+.proop i { border-radius: 3px; background: var(--c); }
+.proop b { display: block; font-family: var(--mono); font-size: 14px; }
+.proop span { font-size: 14px; color: var(--fg-2); }
+#trigSteps .steps { margin-top: 4px; }
+
+/* ---------- lifecycle ---------- */
+.mat { border-top: 4px solid var(--c); }
+.mat .lv { font: 700 12px var(--mono); color: var(--c); }
+.mat h3 { margin: 6px 0 8px; }
+.mat p { margin: 0; font-size: 14.5px; color: var(--fg-2); }
+
+/* ---------- atlas ---------- */
+.atlas-bar { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.seg.filt { flex-wrap: wrap; }
+.search { font: inherit; font-size: 15px; padding: 9px 14px; border-radius: 10px; border: 1px solid var(--line-2); background: var(--card); color: var(--fg); min-width: 260px; flex: 1; max-width: 360px; }
+.search:focus { outline: 2px solid var(--blue); outline-offset: 1px; }
+.atlas { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px; margin-top: 8px; }
+.mod { background: var(--card); border-radius: var(--r-lg); box-shadow: var(--shadow); padding: 22px; border-top: 4px solid var(--c); display: flex; flex-direction: column; gap: 10px; min-width: 0; scroll-margin-top: 80px; transition: box-shadow .3s; }
+.mod.flash { box-shadow: 0 0 0 3px var(--c), var(--shadow-lg); }
+.mod .ly { font-size: 11.5px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: var(--c); }
+.mod h3 { margin: 0; font-size: 19px; letter-spacing: -.02em; }
+.mod p { margin: 0; font-size: 14px; }
+.mod p.w { color: var(--fg-2); }
+.mod .lbl { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--fg-3); margin-top: 4px; }
+.mod .types { display: flex; flex-wrap: wrap; gap: 5px; }
+.mod .open { margin-top: auto; display: flex; justify-content: space-between; align-items: center; font-size: 13.5px; padding-top: 6px; }
+.mod .open button { font: inherit; font-size: 13.5px; color: var(--blue); background: none; border: 0; cursor: pointer; padding: 0; }
+
+/* ---------- package table ---------- */
+.pk td code { font: 12px var(--mono); background: transparent; padding: 0; overflow-wrap: anywhere; }
+.pk td:first-child { white-space: normal; }
+.pk .grp td { background: var(--card-2); font-size: 11.5px; text-transform: uppercase; letter-spacing: .06em; color: var(--c); padding: 8px 14px; }
+.pk .na { color: var(--fg-3); }
+
+/* ---------- ecosystem / roadmap ---------- */
+.eco { border-top: 4px solid var(--c); }
+.eco h3 { margin: 8px 0 8px; font-size: 18px; }
+.eco p { margin: 0; font-size: 14.5px; color: var(--fg-2); }
+.roadmap { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 12px; }
+.rd { background: var(--card); border-radius: var(--r-md); box-shadow: var(--shadow); padding: 16px 18px; display: grid; grid-template-columns: 34px 1fr; gap: 12px; }
+.rd .n { width: 30px; height: 30px; border-radius: 9px; background: linear-gradient(135deg, var(--blue), var(--purple)); color: #fff; display: grid; place-items: center; font-weight: 700; font-size: 13px; }
+.rd > div { min-width: 0; }
+.rd .mchip, .mod .mchip, .band .mchip { white-space: normal; text-align: left; max-width: 100%; }
+#credTable td:first-child { white-space: normal; }
+.rec { white-space: nowrap; }
+.rd b { display: block; font-size: 15px; letter-spacing: -.01em; }
+.rd span { font-size: 13px; color: var(--fg-2); display: block; margin: 2px 0 8px; }
+.srcs { columns: 2; column-gap: 32px; margin: 0; padding-left: 18px; font-size: 14px; }
+.srcs li { margin-bottom: 6px; break-inside: avoid; }
+@media (max-width: 700px) { .srcs { columns: 1; } }
+
+/* restore base section rhythm (.wrap padding overrides the section rule) */
+section.wrap { padding-top: 96px; padding-bottom: 16px; }
+@media (max-width: 600px) { section.wrap { padding-top: 64px; } }
+
+</style>
+</head>
+<body>
+<nav class="nav" aria-label="Sections">
+  <div class="nav-inner">
+    <a class="brand" href="#top"><span class="brand-dot">AS</span><span>Agents SDK Atlas</span></a>
+    <div class="nav-links" id="navlinks">
+      <a href="#atom">Nucleus</a>
+      <a href="#layers">Layers</a>
+      <a href="#turn">Turn</a>
+      <a href="#routing">Routing</a>
+      <a href="#state">State</a>
+      <a href="#identity">Identity</a>
+      <a href="#brain">Brain</a>
+      <a href="#channels">Channels</a>
+      <a href="#ship">Ship</a>
+      <a href="#atlas">Atlas</a>
+      <a href="#packages">Packages</a>
+      <a href="#roadmap">Roadmap</a>
+    </div>
+    <div class="seg small" role="group" aria-label="Theme" id="themeSeg">
+      <button type="button" data-theme="auto">Auto</button>
+      <button type="button" data-theme="light">Light</button>
+      <button type="button" data-theme="dark">Dark</button>
+    </div>
+  </div>
+</nav>
+
+<main id="top">
+  <!-- HERO -->
+  <header class="hero wrap" id="overview">
+    <p class="eyebrow">Learning session · Microsoft 365 Agents SDK · module map</p>
+    <h1>Every building block.<br><span class="grad">And how they connect.</span></h1>
+    <p class="lede">The Agents SDK is the plumbing between a person in Teams, Copilot, a website or Slack and the AI logic you choose. This page maps every module, the layer it sits in, and how it connects to the others.</p>
+    <div class="pills">
+      <span class="pill"><span class="dot"></span>C# · JavaScript · Python</span>
+      <span class="pill"><span class="dot" style="background:var(--blue);box-shadow:0 0 0 4px color-mix(in srgb,var(--blue) 22%,transparent)"></span>AI-agnostic by design</span>
+      <span class="pill"><span class="dot" style="background:var(--purple);box-shadow:0 0 0 4px color-mix(in srgb,var(--purple) 22%,transparent)"></span>Evolution of Bot Framework SDK</span>
+    </div>
+    <div class="stats" role="list" id="heroStats"></div>
+  </header>
+
+  <!-- THREE PROBLEMS -->
+  <section class="wrap" id="why">
+    <div class="sec-head">
+      <p class="eyebrow">Why it exists</p>
+      <h2>Three problems, solved once.</h2>
+      <p class="lede">Everything else in the SDK is a consequence of these three design goals.</p>
+    </div>
+    <div class="grid-3" id="problems"></div>
+    <div class="card isnt" style="margin-top:20px">
+      <div><h3>What it is</h3><ul class="check" id="isList"></ul></div>
+      <div><h3>What it is not</h3><ul class="check" id="isntList"></ul></div>
+    </div>
+  </section>
+
+  <!-- ATOM -->
+  <section class="wrap" id="atom">
+    <div class="sec-head">
+      <p class="eyebrow">The nucleus model</p>
+      <h2>An agent is an atom.</h2>
+      <p class="lede">At the centre is the turn engine. Core services orbit it, then capabilities and extensions, then the outside world. Select any module to light up what it connects to.</p>
+    </div>
+    <div class="card diagram-card">
+      <div class="diagram-bar">
+        <div class="legend" id="ringLegend"></div>
+        <div class="seg small" role="group" aria-label="Edges" id="edgeSeg">
+          <button type="button" data-v="sel" aria-pressed="true">Selected</button>
+          <button type="button" data-v="all" aria-pressed="false">All links</button>
+        </div>
+      </div>
+      <div class="scroll-x"><svg class="atom" id="atomSvg" viewBox="0 0 1160 720" role="img" aria-label="Orbital map of Agents SDK modules"></svg></div>
+      <div class="detail mod-detail" id="atomDetail" aria-live="polite"></div>
+    </div>
+  </section>
+
+  <!-- LAYERS -->
+  <section class="wrap" id="layers">
+    <div class="sec-head">
+      <p class="eyebrow">Layering</p>
+      <h2>Ten layers, top to bottom.</h2>
+      <p class="lede">The same modules, arranged as a stack. A request travels down from the surface to your logic, and the reply climbs back up. Select a chip to open it in the atom view.</p>
+    </div>
+    <div class="stack" id="stack"></div>
+  </section>
+
+  <!-- TURN -->
+  <section class="wrap" id="turn">
+    <div class="sec-head">
+      <p class="eyebrow">Anatomy of a turn</p>
+      <h2>“What changed in my order 4521?”</h2>
+      <p class="lede">One user message in Teams, followed through every module it touches. Press Play, or select an arrow.</p>
+    </div>
+    <div class="card">
+      <div class="life-head">
+        <div class="seg" role="group" aria-label="Jump to" id="seqJump"></div>
+        <div class="ctrl">
+          <button class="btn ghost" type="button" id="seqPrev" aria-label="Previous">‹</button>
+          <button class="btn" type="button" id="seqPlay">Play</button>
+          <button class="btn ghost" type="button" id="seqNext" aria-label="Next">›</button>
+        </div>
+      </div>
+      <div class="seq-wrap">
+        <div class="scroll-x"><svg class="seq" id="seq" role="img" aria-label="Sequence diagram of one turn"></svg></div>
+        <div class="seq-panel" id="seqPanel" aria-live="polite"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ROUTING -->
+  <section class="wrap" id="routing">
+    <div class="sec-head">
+      <p class="eyebrow">AgentApplication · routing engine</p>
+      <h2>Routes, ranks and hooks.</h2>
+      <p class="lede">Routes pair a selector with a handler. They're sorted once, when you register them, and by default the first match wins.</p>
+    </div>
+    <div class="grid-2">
+      <div class="card">
+        <h3>1 · Route type always wins over rank</h3>
+        <div class="tiers" id="tiers"></div>
+        <h3 style="margin-top:26px">2 · Then rank, inside each type</h3>
+        <div class="ranks" id="ranks"></div>
+      </div>
+      <div class="card">
+        <h3>What a route can match</h3>
+        <ul class="feat" id="selectors"></ul>
+        <h3 style="margin-top:22px">The turn pipeline</h3>
+        <div class="pipe" id="pipe"></div>
+      </div>
+    </div>
+    <div class="card code-card" style="margin-top:20px">
+      <div class="life-head">
+        <h3>The same agent in three languages</h3>
+        <div class="seg small" role="group" aria-label="Language" id="langSeg">
+          <button type="button" data-v="net" aria-pressed="true">C#</button>
+          <button type="button" data-v="js" aria-pressed="false">JavaScript</button>
+          <button type="button" data-v="py" aria-pressed="false">Python</button>
+        </div>
+      </div>
+      <pre id="codeSample"></pre>
+    </div>
+  </section>
+
+  <!-- STATE -->
+  <section class="wrap" id="state">
+    <div class="sec-head">
+      <p class="eyebrow">Memory · state · storage</p>
+      <h2>Stateless agent, stateful conversation.</h2>
+      <p class="lede">Any instance can serve the next turn, so memory lives outside the process. There are three layers: storage, state management and TurnState.</p>
+    </div>
+    <div class="state-flow" id="stateFlow"></div>
+    <div class="grid-3" id="scopes" style="margin-top:20px"></div>
+    <div class="card" style="padding:8px 6px;margin-top:20px"><div class="scroll-x"><table class="ws" id="storeTable"></table></div></div>
+    <div class="callout warn" style="margin-top:20px"><div class="ic">!</div><div><b>Where does “AI memory” live?</b> The SDK doesn't have a separate memory module. Chat history for your orchestrator is something you put in conversation state. For example, Semantic Kernel's <code>ChatHistory</code> is read from <code>turnState.Conversation</code>. Long-term knowledge such as retrieval or vector search belongs to the AI layer you bring.</div></div>
+  </section>
+
+  <!-- IDENTITY -->
+  <section class="wrap" id="identity">
+    <div class="sec-head">
+      <p class="eyebrow">Identity & auth</p>
+      <h2>Three identities, never mixed up.</h2>
+      <p class="lede">The agent proves who it is. The user signs in. In agentic scenarios, the agent can also act with its own Entra Agent ID. Each one has its own module.</p>
+    </div>
+    <div class="grid-3" id="idCards"></div>
+    <div class="grid-2" style="margin-top:20px">
+      <div class="card" style="padding:8px 6px"><div class="scroll-x"><table class="ws" id="credTable"></table></div></div>
+      <div class="card">
+        <h3>OAuth: auto sign-in or per route?</h3>
+        <div class="kvlist" id="oauthKv"></div>
+        <div class="tip"><b>Rule of thumb:</b> read the user token <i>as late as possible</i> in the handler, so the SDK can refresh it if it's close to expiry.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- BRAIN -->
+  <section class="wrap" id="brain">
+    <div class="sec-head">
+      <p class="eyebrow">Bring your own brain</p>
+      <h2>The SDK carries the message. You choose the mind.</h2>
+      <p class="lede">The Agents SDK never decides what to say. It hands your handler a turn, and you call whatever orchestrator and model you like.</p>
+    </div>
+    <div class="brain-split">
+      <div class="card">
+        <div class="seg" role="group" aria-label="Orchestrator" id="brainSeg"></div>
+        <div id="brainBody" class="brain-body"></div>
+      </div>
+      <div class="card plug">
+        <h3>Where it plugs in</h3>
+        <ol class="do" id="plugSteps"></ol>
+      </div>
+    </div>
+  </section>
+
+  <!-- CHANNELS -->
+  <section class="wrap" id="channels">
+    <div class="sec-head">
+      <p class="eyebrow">Surfaces & channels</p>
+      <h2>Write once. Respect each channel.</h2>
+      <p class="lede">The Activity Protocol normalises messages across channels, but each channel supports different features. Check <code>activity.channelId</code> and adjust your response.</p>
+    </div>
+    <div class="card" style="padding:8px 6px"><div class="scroll-x"><table class="ws matrix" id="chanMatrix"></table></div></div>
+    <h3 class="sub-h">Teams extension: nine feature areas</h3>
+    <div class="grid-3" id="teamsGrid"></div>
+    <h3 class="sub-h">Proactive messaging: the agent speaks first</h3>
+    <div class="grid-2">
+      <div class="card"><h3>Three operations</h3><div id="proOps"></div></div>
+      <div class="card">
+        <div class="life-head"><h3>Two trigger patterns</h3>
+          <div class="seg small" role="group" aria-label="Trigger" id="trigSeg">
+            <button type="button" data-v="int" aria-pressed="true">Internal</button>
+            <button type="button" data-v="ext" aria-pressed="false">External</button>
+          </div></div>
+        <div id="trigSteps"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- SHIP -->
+  <section class="wrap" id="ship">
+    <div class="sec-head">
+      <p class="eyebrow">Developer lifecycle</p>
+      <h2>From empty folder to production.</h2>
+      <p class="lede">The tools that sit around the runtime: scaffolding, local testing, provisioning, deployment and the production-readiness checklist.</p>
+    </div>
+    <div class="card">
+      <div class="life-head">
+        <div class="seg" role="group" aria-label="Lifecycle" id="lifeSeg">
+          <button type="button" data-v="build" aria-pressed="true">Build & test</button>
+          <button type="button" data-v="ship" aria-pressed="false">Provision & ship</button>
+          <button type="button" data-v="migrate" aria-pressed="false">Migrate from Bot Framework</button>
+        </div>
+        <div class="ctrl"><button class="btn" type="button" id="lifePlay">Play</button></div>
+      </div>
+      <div id="lifeStepper"></div>
+    </div>
+    <div class="grid-3" id="maturity" style="margin-top:20px"></div>
+    <div class="grid-2" style="margin-top:20px">
+      <div class="card"><h3 style="margin-bottom:14px">Required controls</h3><ul class="check" id="reqControls"></ul></div>
+      <div class="card"><h3 style="margin-bottom:14px">Only if you use the capability</h3><ul class="check" id="condControls"></ul></div>
+    </div>
+    <h3 class="sub-h">Left behind in the move from Bot Framework</h3>
+    <div class="card" style="padding:8px 6px"><div class="scroll-x"><table class="ws" id="bfTable"></table></div></div>
+  </section>
+
+  <!-- ATLAS -->
+  <section class="wrap" id="atlas">
+    <div class="sec-head">
+      <p class="eyebrow">Module atlas</p>
+      <h2>All modules, one card each.</h2>
+      <p class="lede">Filter by layer or search. Each card shows what the module does, why it exists, its key types and what it connects to.</p>
+    </div>
+    <div class="atlas-bar">
+      <div class="seg filt" role="group" aria-label="Layer filter" id="layerFilter"></div>
+      <input id="atlasSearch" class="search" type="search" placeholder="Search modules, types, packages…" aria-label="Search modules">
+    </div>
+    <p class="muted small" id="atlasCount"></p>
+    <div class="atlas" id="atlasGrid"></div>
+  </section>
+
+  <!-- PACKAGES -->
+  <section class="wrap" id="packages">
+    <div class="sec-head">
+      <p class="eyebrow">Package map</p>
+      <h2>What to install, per language.</h2>
+      <p class="lede">.NET (NuGet), JavaScript (npm) and Python (PyPI) packages, matched by module. A dash means the module isn't listed for that language. Check the repo before planning around it.</p>
+    </div>
+    <div class="card" style="padding:8px 6px"><div class="scroll-x"><table class="ws pk" id="pkTable"></table></div></div>
+  </section>
+
+  <!-- ECOSYSTEM + ROADMAP -->
+  <section class="wrap" id="roadmap">
+    <div class="sec-head">
+      <p class="eyebrow">Ecosystem & next sessions</p>
+      <h2>Similar names, different jobs.</h2>
+      <p class="lede">Agents SDK is one piece of a larger set. Know its neighbours, then go deep on one module per session.</p>
+    </div>
+    <div class="grid-3" id="eco"></div>
+    <h3 class="sub-h">Suggested deep-dive sessions</h3>
+    <div class="roadmap" id="road"></div>
+    <h3 class="sub-h">Sources</h3>
+    <div class="card"><ul class="srcs" id="sources"></ul></div>
+  </section>
+</main>
+
+<footer class="wrap">
+  <p><a href="../index.html">← Back to the Agents Learning Hub</a></p>
+  <p>Microsoft 365 Agents SDK Atlas · built from Microsoft Learn and the official microsoft/Agents repositories · November 2026</p>
+  <p>Versions seen: .NET 1.6.150 · JavaScript 1.9.1 · Python 1.9.0. Preview features are marked and may change.</p>
+</footer>
+<div class="toast" id="toast">Copied</div>
+
+<script>
+/* apple-html runtime. Exposes window.UI. No dependencies.
+   Pages call UI.init() once at the end, after their own rendering code. */
+(() => {
+  const SVG = "http://www.w3.org/2000/svg";
+  const THEME_KEY = "apple-html-theme";
+  const $ = (s, r = document) => r.querySelector(s);
+  const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+  const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+  // Escape first, then allow `code`, **bold**, *italic*.
+  const fmt = (s) => esc(s).replace(/`([^`]+)`/g, "<code>$1</code>").replace(/\*\*([^*]+)\*\*/g, "<b>$1</b>").replace(/(^|[^*])\*([^*\s][^*]*)\*/g, "$1<i>$2</i>");
+
+  /* ---------- theme ---------- */
+  const mq = matchMedia("(prefers-color-scheme: dark)");
+  const themeListeners = [];
+  let pref = localStorage.getItem(THEME_KEY) || "auto";
+  const theme = () => (pref === "auto" ? (mq.matches ? "dark" : "light") : pref);
+  function applyTheme() {
+    document.documentElement.dataset.theme = theme();
+    $$("#themeSeg button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.theme === pref)));
+    themeListeners.forEach((f) => f(theme()));
+  }
+  function initTheme() {
+    $$("#themeSeg button").forEach((b) => b.addEventListener("click", () => { pref = b.dataset.theme; localStorage.setItem(THEME_KEY, pref); applyTheme(); }));
+    mq.addEventListener("change", () => pref === "auto" && applyTheme());
+    applyTheme();
+  }
+
+  /* ---------- toast + copy ---------- */
+  let tt;
+  function toast(msg = "Copied") {
+    let t = $("#toast");
+    if (!t) { t = Object.assign(document.createElement("div"), { id: "toast", className: "toast" }); document.body.append(t); }
+    t.textContent = msg; t.classList.add("show"); clearTimeout(tt); tt = setTimeout(() => t.classList.remove("show"), 1300);
+  }
+  async function copy(text, btn) {
+    try { await navigator.clipboard.writeText(text); }
+    catch { const ta = Object.assign(document.createElement("textarea"), { value: text }); document.body.append(ta); ta.select(); document.execCommand("copy"); ta.remove(); }
+    if (btn && btn.classList.contains("copy")) { btn.classList.add("done"); const old = btn.textContent; btn.textContent = "Copied"; setTimeout(() => { btn.classList.remove("done"); btn.textContent = old; }, 1400); }
+    toast("Copied");
+  }
+  function initCopy() {
+    document.addEventListener("click", (e) => { const b = e.target.closest("[data-copy]"); if (b) copy(b.dataset.copy, b); });
+  }
+
+  /* ---------- nav scroll spy ---------- */
+  function initNav() {
+    const links = $$("#navlinks a");
+    if (!links.length) return;
+    const spy = new IntersectionObserver((es) => {
+      for (const e of es) if (e.isIntersecting) links.forEach((a) => a.classList.toggle("active", a.getAttribute("href") === `#${e.target.id}`));
+    }, { rootMargin: "-45% 0px -50% 0px" });
+    links.forEach((a) => { const t = document.getElementById(a.getAttribute("href").slice(1)); if (t) spy.observe(t); });
+  }
+
+  /* ---------- segmented control ---------- */
+  // <div class="seg" id="x"><button data-v="a" aria-pressed="true">A</button>…</div>
+  function seg(el, onSelect) {
+    const root = typeof el === "string" ? $(el) : el;
+    const btns = $$("button", root);
+    const select = (v) => { btns.forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.v === v))); onSelect?.(v); };
+    btns.forEach((b) => b.addEventListener("click", () => select(b.dataset.v)));
+    return { select };
+  }
+
+  /* ---------- key/value rows ---------- */
+  // rows: [[key, value, kind?]] kind: "secret" (no copy, muted) | "text" (no copy) | undefined (copyable mono)
+  function kv(rows) {
+    return `<div class="kv">${rows.map(([k, v, kind]) => {
+      const cls = kind === "secret" ? "v secret" : kind === "text" ? "v text" : "v";
+      const btn = kind ? "" : `<button class="copy" type="button" data-copy="${esc(v)}" aria-label="Copy ${esc(k)}">Copy</button>`;
+      return `<div class="k">${esc(k)}</div><div class="${cls}">${esc(v)}</div><div class="c">${btn}</div>`;
+    }).join("")}</div>`;
+  }
+
+  /* ---------- svg helpers ---------- */
+  const svgEl = (parent, tag, attrs = {}) => {
+    const n = document.createElementNS(SVG, tag);
+    for (const [k, v] of Object.entries(attrs)) n.setAttribute(k, v);
+    parent.append(n); return n;
+  };
+  function markers(svg) {
+    const defs = svgEl(svg, "defs");
+    for (const [id, color] of [["gray", "var(--fg-3)"], ["blue", "var(--blue)"], ["purple", "var(--purple)"], ["green", "var(--green)"], ["orange", "var(--orange)"]]) {
+      const m = svgEl(defs, "marker", { id: `${svg.id}-arrow-${id}`, viewBox: "0 0 10 10", refX: "8", refY: "5", markerWidth: "8", markerHeight: "8", orient: "auto-start-reverse", markerUnits: "userSpaceOnUse" });
+      svgEl(m, "path", { d: "M0,0 L10,5 L0,10 z", style: `fill:${color}` });
+    }
+  }
+  function pill(parent, x, y, text, cls = "lbl", rot = 0) {
+    const g = svgEl(parent, "g", { class: cls, transform: rot ? `rotate(${rot} ${x} ${y})` : "" });
+    const r = svgEl(g, "rect", { rx: 9 });
+    const t = svgEl(g, "text", { x, y: y + 4, "text-anchor": "middle" }); t.textContent = text;
+    const bb = t.getBBox();
+    Object.entries({ x: bb.x - 8, y: bb.y - 3, width: bb.width + 16, height: bb.height + 6 }).forEach(([k, v]) => r.setAttribute(k, v));
+    return g;
+  }
+
+  /* ---------- architecture diagram ----------
+     <svg class="arch" id="arch" viewBox="0 0 W H"></svg>
+     zones: [{label, x, y, w, h, c:"--blue"}]
+     nodes: [{id, x, y, w, h, c, t, s, ...anything}]   (h ≥ 56 shows subtitle s)
+     edges: [{d:"M.. H.. V..", cls:"" | "flow" | "dash" | "ui", arrow:"gray|blue|purple|green|orange", lbl:[x, y, text, tone?, rotate?]}]
+     onSelect(node) renders your detail panel. */
+  function diagram(svgSel, { zones = [], nodes = [], edges = [], onSelect, initial }) {
+    const svg = typeof svgSel === "string" ? $(svgSel) : svgSel;
+    markers(svg);
+    for (const z of zones) {
+      const g = svgEl(svg, "g", { class: "zone" });
+      svgEl(g, "rect", { x: z.x, y: z.y, width: z.w, height: z.h, rx: 20, style: `fill:color-mix(in srgb, var(${z.c}) 6%, transparent);stroke:color-mix(in srgb, var(${z.c}) 28%, transparent)` });
+      svgEl(g, "text", { x: z.x + 18, y: z.y + 26, style: `fill:var(${z.c})` }).textContent = z.label;
+    }
+    const edgeL = svgEl(svg, "g"), nodeL = svgEl(svg, "g"), lblL = svgEl(svg, "g");
+    for (const e of edges) {
+      const p = svgEl(edgeL, "path", { d: e.d, class: `edge ${e.cls || ""}` });
+      if (e.arrow) p.setAttribute("marker-end", `url(#${svg.id}-arrow-${e.arrow})`);
+      if (e.lbl) { const [x, y, t, tone = "", rot = 0] = e.lbl; pill(lblL, x, y, t, `lbl ${tone}`, rot); }
+    }
+    const els = {};
+    const select = (id, fromUser) => {
+      const n = nodes.find((x) => x.id === id); if (!n) return;
+      Object.values(els).forEach((g) => g.classList.remove("sel")); els[id].classList.add("sel");
+      onSelect?.(n, fromUser);
+    };
+    for (const n of nodes) {
+      const g = svgEl(nodeL, "g", { class: "node", tabindex: "0", role: "button", "aria-label": `${n.t}: show details` });
+      svgEl(g, "rect", { class: "box", x: n.x, y: n.y, width: n.w, height: n.h, rx: 14 });
+      svgEl(g, "rect", { x: n.x + 12, y: n.y + 14, width: 4, height: n.h - 28, rx: 2, style: `fill:var(${n.c || "--blue"})` });
+      const tall = n.h >= 56;
+      svgEl(g, "text", { class: "t", x: n.x + 26, y: n.y + (tall && n.s ? 31 : n.h / 2 + 5) }).textContent = n.t;
+      if (n.s && tall) svgEl(g, "text", { class: "s", x: n.x + 26, y: n.y + 50 }).textContent = n.s;
+      g.addEventListener("click", () => select(n.id, true));
+      g.addEventListener("keydown", (ev) => { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); select(n.id, true); } });
+      els[n.id] = g;
+    }
+    if (initial ?? nodes[0]?.id) select(initial ?? nodes[0].id, false);
+    return { select };
+  }
+
+  /* ---------- sequence diagram ----------
+     <svg class="seq" id="seq"></svg>
+     lanes: [{id, t, c}]
+     items: [{g:"GROUP TITLE"} | {f, to, l, kind:"resp"?, ui:1?, ...anything}]
+     onShow(step, index, total, groupIndex) renders your explanation panel.
+     Returns {show, next, prev, play, stop, groups, steps}. */
+  function sequence(svgSel, { lanes, items, onShow, width = 1000, row = 42, group = 34 }) {
+    const svg = typeof svgSel === "string" ? $(svgSel) : svgSel;
+    markers(svg);
+    const laneX = {};
+    lanes.forEach((l, i) => { laneX[l.id] = 70 + i * ((width - 140) / Math.max(1, lanes.length - 1)); });
+    let y = 70; const rows = [];
+    for (const it of items) { rows.push({ ...it, y }); y += it.g ? group : row; }
+    const H = y + 16;
+    svg.setAttribute("viewBox", `0 0 ${width} ${H}`);
+    const lifeL = svgEl(svg, "g"), grpL = svgEl(svg, "g"), msgL = svgEl(svg, "g"), headL = svgEl(svg, "g");
+    for (const l of lanes) {
+      svgEl(lifeL, "line", { class: "life", x1: laneX[l.id], x2: laneX[l.id], y1: 52, y2: H - 6 });
+      const g = svgEl(headL, "g", { class: "lane-head" });
+      svgEl(g, "rect", { x: laneX[l.id] - 64, y: 12, width: 128, height: 38, rx: 10 });
+      svgEl(g, "rect", { x: laneX[l.id] - 50, y: 46, width: 100, height: 3, rx: 1.5, style: `fill:var(${l.c || "--blue"})` });
+      svgEl(g, "text", { x: laneX[l.id], y: 36, "text-anchor": "middle" }).textContent = l.t;
+    }
+    const steps = rows.filter((r) => !r.g), msgEls = [];
+    const groups = [];
+    rows.forEach((r, i) => {
+      if (r.g) {
+        const g = svgEl(grpL, "g", { class: "grp" });
+        svgEl(g, "rect", { x: 4, y: r.y + 4, width: width - 8, height: 22, rx: 6 });
+        svgEl(g, "text", { x: 14, y: r.y + 19 }).textContent = r.g;
+        groups.push({ g: r.g, first: steps.indexOf(rows.slice(i + 1).find((x) => !x.g)) });
+        return;
+      }
+      const idx = steps.indexOf(r);
+      const x1 = laneX[r.f], x2 = laneX[r.to], dir = Math.sign(x2 - x1) || 1, ly = r.y + 27;
+      const g = svgEl(msgL, "g", { class: `msg ${r.kind === "resp" ? "resp" : ""} ${r.ui ? "ui" : ""}`, tabindex: "0", role: "button", "aria-label": `Step ${idx + 1}: ${r.t || r.l}` });
+      svgEl(g, "rect", { class: "hit", x: 0, y: r.y, width, height: row });
+      svgEl(g, "line", { x1: x1 + dir * 12, y1: ly, x2: x2 - dir * 4, y2: ly, "marker-end": `url(#${svg.id}-arrow-${r.ui ? "purple" : "gray"})` });
+      pill(g, (x1 + x2) / 2, r.y + 12, r.l, "lbl").querySelector("text").setAttribute("class", "l");
+      svgEl(g, "circle", { cx: x1, cy: ly, r: 10 });
+      svgEl(g, "text", { class: "n", x: x1, y: ly + 3.5, "text-anchor": "middle" }).textContent = idx + 1;
+      g.addEventListener("click", () => { api.stop(); api.show(idx); });
+      g.addEventListener("keydown", (ev) => { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); api.stop(); api.show(idx); } });
+      msgEls.push(g);
+    });
+    let cur = 0, timer = null;
+    const api = {
+      steps, groups,
+      show(i) {
+        cur = Math.max(0, Math.min(steps.length - 1, i));
+        msgEls.forEach((g, k) => g.classList.toggle("on", k === cur));
+        onShow?.(steps[cur], cur, steps.length, groups.filter((g) => g.first <= cur).length - 1);
+      },
+      next() { api.show(cur + 1); }, prev() { api.show(cur - 1); },
+      get index() { return cur; },
+      play(ms = 2800, onState) {
+        if (timer) return api.stop(onState);
+        if (cur >= steps.length - 1) api.show(0);
+        onState?.(true);
+        timer = setInterval(() => (cur >= steps.length - 1 ? api.stop(onState) : api.show(cur + 1)), ms);
+      },
+      stop(onState) { clearInterval(timer); timer = null; onState?.(false); },
+    };
+    return api;
+  }
+
+  /* ---------- stepper (vertical numbered steps with play) ----------
+     container: element; steps: [{t, p, c:[chips]}]; returns {go, play, stop} */
+  function stepper(container, steps) {
+    const root = typeof container === "string" ? $(container) : container;
+    let active = 0, timer = null;
+    const render = () => {
+      root.innerHTML = `<div class="steps">${steps.map((s, i) => `
+        <div class="step ${i === active ? "on" : i < active ? "done" : ""}" data-i="${i}" tabindex="0" role="button">
+          <div class="n">${i + 1}</div>
+          <div><h4>${esc(s.t)}</h4><p>${fmt(s.p)}</p>${s.c?.length ? `<div class="chips">${s.c.map((c) => `<code>${esc(c)}</code>`).join("")}</div>` : ""}</div>
+        </div>`).join("")}</div>`;
+    };
+    root.addEventListener("click", (e) => { const s = e.target.closest(".step"); if (s) { api.stop(); api.go(+s.dataset.i); } });
+    const api = {
+      go(i) { active = Math.max(0, Math.min(steps.length - 1, i)); render(); },
+      play(ms = 2400, onState) {
+        if (timer) return api.stop(onState);
+        if (active >= steps.length - 1) api.go(0);
+        onState?.(true);
+        timer = setInterval(() => (active >= steps.length - 1 ? api.stop(onState) : api.go(active + 1)), ms);
+      },
+      stop(onState) { clearInterval(timer); timer = null; onState?.(false); },
+      get index() { return active; },
+    };
+    render();
+    return api;
+  }
+
+  function init() { initTheme(); initCopy(); initNav(); }
+
+  window.UI = { $, $$, esc, fmt, toast, copy, seg, kv, diagram, sequence, stepper, init, onTheme: (f) => themeListeners.push(f), theme };
+})();
+
+// Module catalog: the single source of truth for the atom, layers, atlas and package map.
+// ring: 0 nucleus · 1 core services · 2 capabilities & extensions · 3 outside world · null = atlas only
+const LAYERS = [
+  { id: "surf", n: "Surfaces", c: "--purple", d: "Where people (and other agents) meet your agent." },
+  { id: "svc", n: "Azure relay & identity provider", c: "--indigo", d: "Azure Bot Service connects channels to your endpoint, and Entra ID issues every token." },
+  { id: "host", n: "Hosting & transport", c: "--teal", d: "Turns HTTP, named pipes or A2A calls into activities and checks the caller." },
+  { id: "id", n: "Identity & auth", c: "--orange", d: "The agent's own identity, the user's sign-in and agentic identity." },
+  { id: "core", n: "Core runtime (the nucleus)", c: "--blue", d: "Activity, AgentApplication, TurnContext, TurnState, routing and streaming." },
+  { id: "cap", n: "Capabilities", c: "--green", d: "Cards, proactive messaging, feedback, dialogs, and calls to other agents." },
+  { id: "ext", n: "Channel & protocol extensions", c: "--red", d: "Typed add-ons for Teams, Slack, SharePoint and the A2A protocol." },
+  { id: "data", n: "State & storage", c: "--mint", d: "Where conversation memory and transcripts are stored between turns." },
+  { id: "brain", n: "AI brain & downstream APIs (bring your own)", c: "--pink", d: "Your orchestrator, models and the APIs you call. These aren't part of the SDK." },
+  { id: "ops", n: "Observe, test & ship", c: "--gray", d: "Telemetry, tests, toolkit, Playground, provisioning and production readiness." },
+];
+
+const L = "https://learn.microsoft.com/microsoft-365/agents-sdk/";
+const MODULES = [
+  /* ---------- NUCLEUS ---------- */
+  { id: "activity", n: "Activity Protocol", L: "core", ring: 0,
+    what: "The common JSON envelope for everything that happens in a conversation. Types are `message`, `conversationUpdate`, `event`, `invoke` and `typing`. Each activity carries `from`, `recipient`, `conversation`, `channelId`, `text`, `attachments`, `entities` (for example citations) and `channelData`.",
+    why: "Teams, Copilot, Copilot Studio and the SDK all speak this protocol, so your code handles one shape instead of a different format for every surface.",
+    types: ["Activity", "ActivityTypes", "ChannelAccount", "ConversationAccount", "Attachment", "Entity"],
+    pk: { net: "Microsoft.Agents.Core", js: "@microsoft/agents-activity", py: "microsoft-agents-activity" },
+    links: ["app", "ctx", "abs", "agentclient", "ch-teams", "ch-copilot", "ch-webchat", "ch-3p"], doc: L + "activity-protocol" },
+  { id: "app", n: "AgentApplication", L: "core", ring: 0,
+    what: "The agent itself and the entry point for every incoming activity. It owns the route table, middleware and turn hooks, and loads and saves state automatically. It also exposes sub-systems such as `UserAuthorization`, `AdaptiveCards`, `Proactive` and registered extensions.",
+    why: "It replaces Bot Framework's `ActivityHandler` overrides with declarative routes, so you register behaviour instead of subclassing for every event type.",
+    types: ["AgentApplication", "AgentApplicationOptions", "IAgent", "RegisterExtension()", "AddAgent<T>()"],
+    pk: { net: "Microsoft.Agents.Builder", js: "@microsoft/agents-hosting", py: "microsoft-agents-hosting-core" },
+    links: ["routing", "middleware", "ctx", "tstate", "adapter", "userauth", "cards", "proactive", "teams", "slack", "sharepoint", "a2a", "telemetry", "dialogs", "sk", "af", "langchain"], doc: L + "agent-application" },
+  { id: "ctx", n: "TurnContext", L: "core", ring: 0,
+    what: "A per-turn object that holds the incoming activity, the adapter that received it, and methods to reply (`SendActivity`, update, delete), stream and reach services. It's created for each activity and disposed when the turn ends.",
+    why: "Handlers get one interface to the current interaction, whichever channel it came from.",
+    types: ["ITurnContext", "SendActivityAsync()", "SendActivitiesAsync()", "StreamingResponse", "Activity.ChannelData"],
+    pk: { net: "Microsoft.Agents.Builder", js: "@microsoft/agents-hosting", py: "microsoft-agents-hosting-core" },
+    links: ["activity", "app", "streaming", "adapter", "files", "teams", "tstate"], doc: L + "activity-protocol#access-activity-data" },
+  { id: "tstate", n: "TurnState", L: "core", ring: 0,
+    what: "Scoped state buckets that are loaded before your handler runs and saved after it: Conversation, User and Temp (.NET also has PrivateConversation). Keys are built from `channelId` plus the conversation or user ID.",
+    why: "Agents are stateless web apps and any instance can handle the next turn, so context has to be stored outside the process.",
+    types: ["ITurnState", "ConversationState", "UserState", "TempState", "PrivateConversationState"],
+    pk: { net: "Microsoft.Agents.Builder", js: "@microsoft/agents-hosting", py: "microsoft-agents-hosting-core" },
+    links: ["storage", "app", "ctx", "files", "sk", "af", "dialogs"], doc: L + "state-concepts" },
+
+  /* ---------- RING 1 · CORE SERVICES ---------- */
+  { id: "routing", n: "Routing & ranks", L: "core", ring: 1,
+    what: "A route pairs a selector (exact text, regex, activity type, conversation update, card action or custom predicate) with a handler. Routes are sorted by type first (agentic invoke → invoke → agentic → everything else), then by `RouteRank`. The first match wins.",
+    why: "Dispatch is predictable. Time-sensitive invokes such as card actions and OAuth callbacks can't be caught by a catch-all message route.",
+    types: ["OnMessage()", "OnActivity()", "OnConversationUpdate()", "RouteRank.First / Last", "[Route] attributes", "@app.message()"],
+    pk: { net: "Microsoft.Agents.Builder", js: "@microsoft/agents-hosting", py: "microsoft-agents-hosting-core" },
+    links: ["app", "cards", "userauth", "teams", "agentic", "proactive"], doc: L + "agent-application#control-route-evaluation-order" },
+  { id: "middleware", n: "Middleware & turn hooks", L: "core", ring: 1,
+    what: "A chain of components that runs before and after every turn, for example logging, auth checks, normalisation or transcripts. There are also hooks: `OnBeforeTurn` (return false to abort the turn), `OnAfterTurn` (return false to skip saving state) and `OnTurnError`.",
+    why: "Cross-cutting concerns live in one place instead of being repeated in every handler.",
+    types: ["IMiddleware", "MiddlewareSet", "OnBeforeTurn", "OnAfterTurn", "OnTurnError"],
+    pk: { net: "Microsoft.Agents.Builder", js: "@microsoft/agents-hosting", py: "microsoft-agents-hosting-core" },
+    links: ["app", "transcript", "telemetry", "adapter"], doc: L + "agent-application#turn-lifecycle-hooks" },
+  { id: "adapter", n: "Channel adapter", L: "host", ring: 1,
+    what: "`CloudAdapter` receives the POST on `/api/messages`, validates the incoming JWT, builds the TurnContext and runs the pipeline. On the way out it handles invoke responses, expect-replies and streaming.",
+    why: "It keeps transport and caller authentication separate from agent logic, so you can change the host without touching your handlers.",
+    types: ["CloudAdapter", "IChannelAdapter", "IAgentHttpAdapter", "ProcessActivityAsync()", "authorizeJWT()"],
+    pk: { net: "Microsoft.Agents.Hosting.AspNetCore", js: "@microsoft/agents-hosting", py: "microsoft-agents-hosting-core" },
+    links: ["webhosts", "abs", "connections", "app", "ctx", "namedpipes", "a2a", "telemetry"], doc: L + "using-semantic-kernel-agent-framework#programcs" },
+  { id: "connections", n: "Connections (agent identity)", L: "id", ring: 1,
+    what: "Named token providers, configured in settings, that the agent uses to prove its **own** identity to Azure Bot Service and to call other services or agents. MSAL supports client secret (single or multitenant), certificate (thumbprint or subject name), user- or system-assigned managed identity, federated credentials and workload identity.",
+    why: "Credentials are chosen and rotated in one place. In production, prefer managed identity, workload identity or certificates over secrets.",
+    types: ["IConnections", "ConnectionsMap", "MsalAuth", "IAccessTokenProvider", "GetTokenCredential()"],
+    pk: { net: "Microsoft.Agents.Authentication(.Msal)", js: "@microsoft/agents-hosting", py: "microsoft-agents-authentication-msal" },
+    links: ["adapter", "entra", "sidecar", "userauth", "storage", "agentclient", "agentic"], doc: L + "configure-authentication-msal" },
+  { id: "userauth", n: "User authorization (OAuth · OBO)", L: "id", ring: 1,
+    what: "Signs the user in through OAuth connections on the Azure Bot Token Service and gives handlers a user token. Each Azure Bot connection maps to exactly one handler. You can use auto sign-in (.NET only) or per-route handlers, plus an optional On-Behalf-Of exchange with `OBOConnectionName` and `OBOScopes`.",
+    why: "The agent can call Graph, GitHub or a Copilot Studio agent as the user, without ever handling the user's credentials.",
+    types: ["UserAuthorization (.NET)", "authorization (JS)", "auth (Py)", "GetTurnTokenAsync()", "ExchangeTurnTokenAsync()"],
+    pk: { net: "Microsoft.Agents.Builder", js: "@microsoft/agents-hosting", py: "microsoft-agents-hosting-core" },
+    links: ["abs", "entra", "connections", "routing", "cards", "graph", "mcs", "proactive"], doc: L + "agent-oauth-configuration" },
+  { id: "storage", n: "Storage (IStorage)", L: "data", ring: 1,
+    what: "Key-value persistence behind TurnState, stored proactive conversations and transcripts. Built-in options are MemoryStorage (development only), Azure Blob and Cosmos DB (partitioned). You can implement `IStorage` for anything else.",
+    why: "You can change the backing store without touching state code. Memory storage doesn't survive restarts or scale-out.",
+    types: ["IStorage", "MemoryStorage", "BlobsStorage", "CosmosDbPartitionedStorage"],
+    pk: { net: "Microsoft.Agents.Storage(.Blobs/.CosmosDb)", js: "@microsoft/agents-hosting-storage-blob / -cosmos", py: "microsoft-agents-storage-blob / -cosmos" },
+    links: ["tstate", "proactive", "transcript", "dbs", "connections", "a2a"], doc: L + "storage" },
+  { id: "streaming", n: "Streaming & typing", L: "core", ring: 1,
+    what: "`StreamingResponse` sends an informative update, then text chunks, then a final message that can include citations, attachments and feedback buttons. Chunks are throttled to about 1000 ms per update for Teams and 500 ms for Web Chat. Typing indicators are automatic, with timings you can tune per channel.",
+    why: "LLM answers take seconds. Streaming keeps users engaged, and Microsoft Copilot expects streamed responses.",
+    types: ["StreamingResponse", "QueueInformativeUpdateAsync()", "QueueTextChunk()", "EndStreamAsync()", "TypingOptions"],
+    pk: { net: "Microsoft.Agents.Builder", js: "@microsoft/agents-hosting", py: "microsoft-agents-hosting-core" },
+    links: ["ctx", "feedback", "ch-copilot", "ch-teams", "ch-webchat", "models"], doc: L + "teams/teams-feedback" },
+  { id: "files", n: "Attachments & input files", L: "core", ring: 1,
+    what: "Inbound files arrive as attachments on a message. Configured downloaders, such as the Microsoft 365 attachment downloader, fetch them before your route runs and put them in `turnState.Temp.InputFiles`. Download URLs are short-lived, so copy files to your own storage.",
+    why: "Authenticated, short-lived download URLs are easy to get wrong. The downloader handles them once, safely.",
+    types: ["IInputFileDownloader", "M365AttachmentDownloader", "InputFile", "Activity.Attachments"],
+    pk: { net: "Microsoft.Agents.Builder", js: "@microsoft/agents-hosting", py: "microsoft-agents-hosting-core" },
+    links: ["ctx", "tstate", "teams", "prodready"], doc: L + "teams/teams-files" },
+
+  /* ---------- RING 2 · CAPABILITIES & EXTENSIONS ---------- */
+  { id: "cards", n: "Adaptive Cards", L: "cap", ring: 2,
+    what: "Send card JSON as an attachment, then route `Action.Execute` (by verb), `Action.Submit` (by a data field, `verb` by default) and dynamic `Input.ChoiceSet` search. In .NET, card routes can require an OAuth handler.",
+    why: "You get rich, interactive UI inside the chat without building a separate web app.",
+    types: ["AdaptiveCards.OnActionExecute()", "ActionSubmitRoute", "AdaptiveCardInvokeResponseFactory", "CardFactory.adaptiveCard"],
+    pk: { net: "Microsoft.Agents.Builder", js: "@microsoft/agents-hosting", py: "— (card routing not yet in Python)" },
+    links: ["app", "routing", "userauth", "teams", "ch-teams"], doc: L + "adaptive-cards" },
+  { id: "proactive", n: "Proactive messaging", L: "cap", ring: 2,
+    what: "Lets the agent start the conversation. `SendActivity` is fire-and-forget. `ContinueConversation` runs a handler with full context, state and tokens. `CreateConversation` opens a new chat. Store the conversation during a normal turn, then trigger internally (background task) or externally (optional HTTP endpoints).",
+    why: "Covers notifications, reminders and the results of long-running jobs, or anything else the user's latest message didn't cause.",
+    types: ["AgentApplication.Proactive", "StoreConversationAsync()", "ConversationBuilder", "[ContinueConversation]", "MapAgentProactiveEndpoints()"],
+    pk: { net: "Microsoft.Agents.Builder", js: "@microsoft/agents-hosting", py: "microsoft-agents-hosting-core" },
+    links: ["app", "storage", "adapter", "abs", "userauth", "routing"], doc: L + "proactive-overview" },
+  { id: "feedback", n: "Citations & feedback", L: "cap", ring: 2,
+    what: "Citations go in the activity's `entities`, not in attachments. `StreamingResponse` turns markers like `[doc1]` into numbered references and adds thumbs-up and thumbs-down buttons. `OnFeedbackLoop` receives the vote and any comment. Emoji reactions arrive as separate activities.",
+    why: "AI answers people can trust need sources, and you need a way to capture quality signals from users.",
+    types: ["AddCitation()", "AddCitations()", "OnFeedbackLoop", "FeedbackData", "OnMessageReactionsAdded"],
+    pk: { net: "Microsoft.Agents.Builder", js: "@microsoft/agents-hosting-extensions-msteams", py: "partial (no typed feedback route yet)" },
+    links: ["streaming", "teams", "ch-copilot", "telemetry"], doc: L + "teams/teams-feedback" },
+  { id: "teams", n: "Teams extension", L: "ext", ring: 2,
+    what: "Typed, routed access to Teams-only features in nine areas: meetings, task modules, feedback, message extensions, files and file consent, messages, channels, teams lifecycle and conversation members. It also adds a Teams API client to every Teams turn.",
+    why: "You don't need to parse `channelData` by hand or build Teams invoke responses yourself.",
+    types: ["[TeamsExtension]", "TeamsAgentExtension", "ITeamsTurnContext", "TeamsQueryRoute", "TeamsTaskFetchRoute", "teams.meetings.onStart()"],
+    pk: { net: "Microsoft.Agents.Extensions.MSTeams", js: "@microsoft/agents-hosting-extensions-msteams", py: "microsoft-agents-hosting-msteams" },
+    links: ["app", "ch-teams", "cards", "feedback", "files", "routing", "ctx"], doc: L + "teams/teams-extension",
+    note: "The older *-teams packages are superseded by *-msteams. Bots based on TeamsActivityHandler must move to AgentApplication first." },
+  { id: "slack", n: "Slack extension", L: "ext", ring: 2,
+    what: "`SlackAgentExtension` plus a Slack API client, so Slack-specific events and calls are typed, in the same way as the Teams extension.",
+    why: "Slack is a first-class surface, not just a lowest-common-denominator channel.",
+    types: ["SlackAgentExtension", "Slack API client"],
+    pk: { net: "Microsoft.Agents.Extensions.Slack", js: "@microsoft/agents-hosting-extensions-slack", py: "microsoft-agents-hosting-slack" },
+    links: ["app", "ch-3p", "telemetry"], doc: "https://github.com/microsoft/Agents-for-net/tree/main/src/libraries/Extensions/Microsoft.Agents.Extensions.Slack" },
+  { id: "sharepoint", n: "SharePoint extension", L: "ext", ring: 2,
+    what: "Models and activity handlers for SharePoint experiences such as Viva Connections and SharePoint pages.",
+    why: "Brings the agent into SharePoint surfaces with typed events.",
+    types: ["SharePoint activity handlers"],
+    pk: { net: "Microsoft.Agents.Extensions.SharePoint", js: "—", py: "—" },
+    links: ["app", "graph"], doc: "https://github.com/microsoft/Agents-for-net/tree/main/src/libraries/Extensions/Microsoft.Agents.Extensions.SharePoint" },
+  { id: "a2a", n: "A2A protocol", L: "ext", ring: 2, preview: true,
+    what: "Exposes your AgentApplication as an A2A protocol endpoint (JSON-RPC, HTTP+JSON or gRPC). It includes a generated Agent Card, skills, OAuth metadata and a task store, so non-Microsoft agents can call your agent.",
+    why: "Makes your agent interoperable with the open Agent-to-Agent ecosystem, beyond the Activity Protocol.",
+    types: ["Microsoft.Agents.Extensions.A2A", "IAgentCardHandler", "A2AClient", "A2A task store"],
+    pk: { net: "Microsoft.Agents.Hosting.A2A + Extensions.A2A", js: "—", py: "—" },
+    links: ["adapter", "app", "agentclient", "connections", "storage"], doc: "https://github.com/microsoft/Agents-for-net/tree/main/src/libraries/Extensions/Microsoft.Agents.Extensions.A2A" },
+  { id: "agentclient", n: "Agent-to-agent client", L: "cap", ring: 2,
+    what: "Lets one agent start and manage conversations with other Activity Protocol agents and receive replies in sync or streamed mode. Replies come back into AgentApplication through `AgentResponses`.",
+    why: "Supports multi-agent designs, where a front-door agent delegates to specialist agents.",
+    types: ["IAgentHost", "AddAgentHost()", "AgentResponses", "AgentClient (JS)"],
+    pk: { net: "Microsoft.Agents.Client", js: "@microsoft/agents-hosting", py: "—" },
+    links: ["activity", "connections", "a2a", "mcs", "app"], doc: "https://github.com/microsoft/Agents-for-net/tree/main/src/libraries/Client/Microsoft.Agents.Client" },
+  { id: "csclient", n: "Copilot Studio client", L: "cap", ring: 2,
+    what: "A direct-to-engine client for talking to a Copilot Studio agent from your code or app (console, web or React Web Chat). Configure it with `EnvironmentId` + `SchemaName` or a `DirectConnectUrl`. It needs the `CopilotStudio.Copilots.Invoke` permission.",
+    why: "Reuses agents that makers built in Copilot Studio inside pro-code agents and apps.",
+    types: ["CopilotClient", "ConnectionSettings"],
+    pk: { net: "Microsoft.Agents.CopilotStudio.Client", js: "@microsoft/agents-copilotstudio-client", py: "microsoft-agents-copilotstudio-client" },
+    links: ["mcs", "userauth", "app", "telemetry"], doc: L + "integrate-with-mcs", note: "Standard-harness Copilot Studio agents only, for now." },
+  { id: "dialogs", n: "Dialogs (Bot Framework compat)", L: "cap", ring: 2,
+    what: "Waterfall, prompt and component dialogs carried forward from Bot Framework, so existing multi-turn flows run inside AgentApplication. Adaptive Dialogs weren't carried over.",
+    why: "A bridge for migration. New agents usually let an LLM orchestrator handle multi-turn conversations.",
+    types: ["DialogSet", "WaterfallDialog", "ComponentDialog", "Prompts"],
+    pk: { net: "Microsoft.Agents.Builder.Dialogs", js: "@microsoft/agents-hosting-dialogs", py: "microsoft-agents-hosting-dialogs" },
+    links: ["tstate", "app", "telemetry"], doc: L + "bf-migration-guidance" },
+  { id: "transcript", n: "Transcripts", L: "data", ring: 2,
+    what: "`TranscriptLoggerMiddleware` records every inbound and outbound activity to a transcript store: memory for tests, Blob Storage for production.",
+    why: "Gives you a replayable audit trail of conversations for debugging and compliance.",
+    types: ["ITranscriptLogger", "TranscriptLoggerMiddleware", "MemoryTranscriptStore", "BlobsTranscriptStore"],
+    pk: { net: "Microsoft.Agents.Storage.Transcript", js: "—", py: "—" },
+    links: ["middleware", "storage", "dbs"], doc: "https://github.com/microsoft/Agents-for-net/tree/main/src/libraries/Storage/Microsoft.Agents.Storage.Transcript" },
+  { id: "telemetry", n: "Telemetry (OpenTelemetry)", L: "ops", ring: 2,
+    what: "Built-in spans, metrics and logs for the adapter, AgentApplication, turns, connector, storage, auth, proactive, Copilot Studio client, dialogs and more, for example `agents.app.run` and `agents.storage.read`. C# uses System.Diagnostics, and JS and Python use OpenTelemetry. All three are OTLP-compatible.",
+    why: "You can see latency, failures and auth rejections for each turn. Keep prompts and tokens out of exported data.",
+    types: ["agents.adapter.process", "agents.app.route_handler", "agents.turn.send_activities", "agents.activities.received"],
+    pk: { net: "built in (System.Diagnostics)", js: "@microsoft/agents-telemetry", py: "built in (OpenTelemetry)" },
+    links: ["otelbe", "app", "adapter", "storage", "middleware", "prodready"], doc: L + "agent-telemetry" },
+
+  /* ---------- RING 3 · OUTSIDE WORLD ---------- */
+  { id: "ch-teams", n: "Microsoft Teams", L: "surf", ring: 3,
+    what: "Supports rich Adaptive Cards, message updates and deletions, invoke activities (task modules, message extensions), meetings and mentions through `channelData`, and streaming.",
+    why: "The richest Microsoft surface. Use the Teams extension to work with it.",
+    types: ["channelId: msteams"], pk: {}, links: ["abs", "teams", "cards", "streaming", "activity"], doc: L + "activity-protocol#microsoft-teams" },
+  { id: "ch-copilot", n: "Microsoft 365 Copilot", L: "surf", ring: 3,
+    what: "Mostly message activities. Supports citations and references, requires streaming, and has limited Adaptive Card support.",
+    why: "Where your agent appears as a custom engine agent alongside Copilot.",
+    types: ["custom engine agent", "app manifest"], pk: {}, links: ["abs", "streaming", "feedback", "activity"], doc: L + "activity-protocol#microsoft-copilot" },
+  { id: "ch-webchat", n: "Web Chat · Direct Line", L: "surf", ring: 3,
+    what: "Supports every activity type and custom channel data over HTTPS. Can also use the Direct Line App Service extension over named pipes.",
+    why: "Your own website or app, with full control.",
+    types: ["Direct Line", "Web Chat"], pk: {}, links: ["abs", "streaming", "namedpipes", "activity"], doc: L + "activity-protocol#web-chatdirectline" },
+  { id: "ch-3p", n: "Slack · Facebook · Twilio", L: "surf", ring: 3,
+    what: "Non-Microsoft channels through Azure Bot Service connectors. Some activity types may be limited, and cards may render differently or not at all.",
+    why: "Reach users where they already are, with the same agent code.",
+    types: ["channelId per connector"], pk: {}, links: ["abs", "slack", "activity"], doc: L + "activity-protocol#non-microsoft-channels" },
+  { id: "abs", n: "Azure Bot Service", L: "svc", ring: 3,
+    what: "Registers the agent, connects channels, and forwards activities to your messaging endpoint (`https://<host>/api/messages`). Its Token Service holds OAuth connections. It also has Test in Web Chat. Identity options are client secret, user-assigned managed identity and federated credentials.",
+    why: "The relay between every channel and your code, and the token broker for user sign-in.",
+    types: ["Messaging endpoint", "OAuth connection", "Token Service"], pk: {},
+    links: ["adapter", "userauth", "connections", "entra", "ch-teams", "ch-copilot", "ch-webchat", "ch-3p", "proactive"], doc: L + "provision-azure-bot-service-manually" },
+  { id: "entra", n: "Microsoft Entra ID", L: "svc", ring: 3,
+    what: "App registrations for the agent's identity and OAuth providers, managed identities, federated credentials, and Entra Agent ID for agentic identity.",
+    why: "Every token in the system, whether for the agent, the user or an agent instance, comes from here.",
+    types: ["App registration", "Managed identity", "Federated credential", "Agent ID"], pk: {},
+    links: ["connections", "userauth", "sidecar", "agentic", "abs"], doc: L + "azure-bot-user-authorization-federated-credentials" },
+  { id: "sk", n: "Semantic Kernel", L: "brain", ring: 3,
+    what: "Register a `Kernel` as a singleton with `AddKernel()`, add plugins marked with `[KernelFunction]`, and keep `ChatHistory` in `turnState.Conversation`.",
+    why: "A common orchestrator in SDK samples, such as the multi-turn weather agent.",
+    types: ["Kernel", "ChatHistory", "KernelFunction", "AzureOpenAIChatCompletion"], pk: {},
+    links: ["models", "tstate", "app"], doc: L + "using-semantic-kernel-agent-framework#orchestrate-with-semantic-kernel" },
+  { id: "af", n: "Microsoft Agent Framework", L: "brain", ring: 3,
+    what: "Combines Semantic Kernel and AutoGen. Register an `IChatClient` singleton and wrap it in a `ChatClientAgent` with instructions and tools from `AIFunctionFactory`. Keep one thread per conversation and call `RunAsync`.",
+    why: "The forward path for orchestration. There's no Kernel object; `IChatClient` takes its place.",
+    types: ["IChatClient", "ChatClientAgent", "AIFunctionFactory", "RunAsync()"], pk: {},
+    links: ["models", "tstate", "app"], doc: L + "using-semantic-kernel-agent-framework#orchestrate-with-agent-framework" },
+  { id: "langchain", n: "LangChain & others", L: "brain", ring: 3,
+    what: "Any orchestrator works. The SDK has a LangChain sample for JavaScript and GitHub Copilot SDK samples for .NET and Python, and you can also use plain custom code.",
+    why: "The SDK is AI-agnostic, so you can change orchestrators without rewriting channel or state code.",
+    types: ["langchain-multiturn sample", "copilot-sdk sample"], pk: {},
+    links: ["models", "app"], doc: L + "agents-sdk-overview" },
+  { id: "models", n: "Foundry · Azure OpenAI", L: "brain", ring: 3,
+    what: "The model endpoints your orchestrator calls, for example Microsoft Foundry deployments, Azure OpenAI or OpenAI. The SDK's streaming samples stream OpenAI tokens back through StreamingResponse.",
+    why: "Your choice. The SDK makes no assumptions about which model generates the response.",
+    types: ["azure-ai-streaming sample"], pk: {},
+    links: ["sk", "af", "langchain", "streaming"], doc: L + "using-semantic-kernel-agent-framework" },
+  { id: "mcs", n: "Copilot Studio agents", L: "brain", ring: 3,
+    what: "Low-code agents built by makers. Call them with the Copilot Studio client, reach them through OBO, or let Copilot Studio call your agent as a skill. A Genesys sample shows handoff to a live agent.",
+    why: "Pro-code and low-code agents working together.",
+    types: ["copilotstudio-skill sample", "genesys-handoff sample"], pk: {},
+    links: ["csclient", "userauth", "agentclient"], doc: L + "integrate-with-mcs" },
+  { id: "dbs", n: "Cosmos DB · Blob Storage", L: "data", ring: 3,
+    what: "Durable stores for state, conversations and transcripts. Use a `TokenCredential` from a named connection instead of keys.",
+    why: "Required in production and whenever the agent runs on more than one instance.",
+    types: ["CosmosDbPartitionedStorageOptions", "BlobStorageConfig"], pk: {},
+    links: ["storage", "transcript", "connections"], doc: L + "storage" },
+  { id: "otelbe", n: "Azure Monitor · Aspire · Grafana", L: "ops", ring: 3,
+    what: "Any OTLP backend, such as Azure Monitor, the .NET Aspire dashboard, Jaeger or Grafana, receives the SDK's traces, metrics and logs.",
+    why: "Dashboards and alerts for turn counts, failures, latency and auth rejections.",
+    types: ["OTLP exporter"], pk: {}, links: ["telemetry"], doc: L + "agent-telemetry" },
+  { id: "graph", n: "Graph · Copilot APIs", L: "brain", ring: 3,
+    what: "Downstream Microsoft 365 APIs you call with the user's token. The Copilot APIs client libraries ship as a module of the Agents SDK.",
+    why: "Grounds answers in the user's own work data.",
+    types: ["Microsoft Graph", "Microsoft.Agents.M365Copilot"], pk: {},
+    links: ["userauth", "copilotapis", "sharepoint"], doc: "https://learn.microsoft.com/microsoft-365-copilot/extensibility/sdks/api-libraries" },
+
+  /* ---------- ATLAS ONLY ---------- */
+  { id: "webhosts", n: "Web host integrations", L: "host", ring: null,
+    what: "Plugs the adapter into your web framework: ASP.NET Core (`AddAgent`, `UseAgents`, `MapAgentApplicationEndpoints`), Express (`startServer`), Fastify, aiohttp or FastAPI. Samples listen on port 3978.",
+    why: "An agent is just a web app, so you host it with the framework you already know.",
+    types: ["AddAgentDefaults()", "MapDefaultAgentEndpoints()", "startServer(app)", "start_server()"],
+    pk: { net: "Microsoft.Agents.Hosting.AspNetCore", js: "@microsoft/agents-hosting-express / -fastify", py: "microsoft-agents-hosting-aiohttp / -fastapi" },
+    links: ["adapter", "deploy"], doc: L + "quickstart" },
+  { id: "namedpipes", n: "Direct Line named pipes", L: "host", ring: null,
+    what: "A transport for the DirectLineFlex App Service extension. Activities flow over a pair of named pipes instead of HTTP round trips.",
+    why: "Lower latency and no public endpoint hop when you host on App Service with Direct Line.",
+    types: ["AddAgentNamedPipeTransport()", "bfv4.pipes"],
+    pk: { net: "Microsoft.Agents.Hosting.DirectLine.NamedPipes", js: "@microsoft/agents-hosting-directline-namedpipes", py: "—" },
+    links: ["ch-webchat", "adapter"], doc: "https://github.com/microsoft/Agents-for-net/tree/main/src/libraries/Hosting/DirectLine.NamedPipes" },
+  { id: "sidecar", n: "Entra auth sidecar", L: "id", ring: null,
+    what: "Hands token acquisition to the Microsoft Entra ID agent container over HTTP, so agent code never holds secrets, certificates or keys. Supports app, delegated and agentic tokens, and includes health checks.",
+    why: "Agent code needs no credentials, and the same container runs locally in Docker and in production.",
+    types: ["SidecarAuth", "AddSidecarConnections()", "AddSidecarHealthCheck()"],
+    pk: { net: "Microsoft.Agents.Authentication (EntraAuthSidecar)", js: "—", py: "microsoft-agents-authentication-entra-auth-sidecar" },
+    links: ["connections", "entra", "agentic"], doc: "https://github.com/microsoft/Agents-for-net/tree/main/src/libraries/Authentication/Authentication.EntraAuthSidecar" },
+  { id: "agentic", n: "Agentic identity (Agent 365)", L: "id", ring: null,
+    what: "An activity can be agentic, meaning the agent acts as its own Entra agent instance or as an agentic user. `AgenticAuthorization` reads the tenant, instance and user from the activity and gets instance or agentic-user tokens. Agentic routes are evaluated before normal routes.",
+    why: "This is how Agents SDK agents join Microsoft Agent 365 for governed identity, Work IQ tools and notifications.",
+    types: ["AgenticAuthorization", "IsAgenticRequest()", "GetAgenticInstanceTokenAsync()", "IAgenticTokenProvider"],
+    pk: { net: "Microsoft.Agents.Builder", js: "@microsoft/agents-hosting", py: "microsoft-agents-hosting-core" },
+    links: ["routing", "connections", "sidecar", "entra", "telemetry"], doc: "https://learn.microsoft.com/microsoft-agent-365/developer/agent-365-sdk" },
+  { id: "copilotapis", n: "Copilot APIs client libraries", L: "brain", ring: null,
+    what: "Typed models and request builders for the Microsoft 365 Copilot APIs (v1.0 and beta). The core library adds retries, secure redirects, transparent auth and compression.",
+    why: "Call Copilot's capabilities from inside your agent without hand-writing REST calls.",
+    types: ["Microsoft.Agents.M365Copilot", ".Beta", ".Core"],
+    pk: { net: "Microsoft.Agents.M365Copilot", js: "TypeScript library", py: "Python library" },
+    links: ["graph", "userauth"], doc: "https://learn.microsoft.com/microsoft-365-copilot/extensibility/sdks/api-libraries" },
+  { id: "toolkit", n: "Microsoft 365 Agents Toolkit", L: "ops", ring: null,
+    what: "Scaffolding for Visual Studio and VS Code. Press F5 to debug in Agents Playground, Teams or Copilot. It also handles provisioning and deployment, and replaces the old Yeoman generators.",
+    why: "The fastest way from an empty folder to a running agent with all the configuration in place.",
+    types: ["VS / VS Code extension", "templates"], pk: {}, links: ["playground", "provision", "deploy"], doc: L + "create-new-toolkit-project-vsc" },
+  { id: "playground", n: "Agents Playground", L: "ops", ring: null,
+    what: "A local test client that connects to your agent on localhost in anonymous or authenticated mode. Install it as a standalone binary or with npm.",
+    why: "Test without Azure, a tunnel or a Teams tenant.",
+    types: ["agentsplayground"], pk: {}, links: ["adapter", "toolkit", "devtunnel"], doc: L + "test-with-toolkit-project" },
+  { id: "devtunnel", n: "Dev tunnels", L: "ops", ring: null,
+    what: "A public HTTPS URL that forwards to your local agent, so Azure Bot Service can reach it from Teams or Copilot. Use a secret or certificate locally, because managed identity and federated credentials only work when the agent runs on Azure.",
+    why: "Debug the real channel experience against code running on your laptop.",
+    types: ["devtunnel host", "--allow-anonymous"], pk: {}, links: ["abs", "playground"], doc: L + "test-with-dev-tunnel" },
+  { id: "tests", n: "Unit testing", L: "ops", ring: null,
+    what: "`TestAdapter` is an in-process channel, `TestFlow` is a fluent send-and-assert API, and `AgentTestHost` mirrors your `Program.cs`. It includes a `MockUserTokenClient` for OAuth and `SemanticValidator` to check AI answers by meaning.",
+    why: "Run conversations as fast, repeatable tests, including multi-turn flows, typing, OAuth and middleware.",
+    types: ["TestAdapter", "TestFlow", "AgentTestHost", "SemanticValidator"],
+    pk: { net: "Microsoft.Agents.Builder.Testing", js: "—", py: "microsoft-agents-testing" },
+    links: ["app", "adapter", "userauth", "middleware"], doc: L + "unit-testing-agents-dotnet" },
+  { id: "provision", n: "Provisioning", L: "ops", ring: null,
+    what: "Create the Azure Bot and its identity (secret, user-assigned managed identity or federated credentials), add the Teams channel and an OAuth connection, and generate the agent's connection config. Do it by hand or with the Agents SDK plugin for GitHub Copilot CLI or Claude Code.",
+    why: "Provisioning is separate from code. The identity you pick decides how the agent authenticates.",
+    types: ["agents-sdk-provision skill", "Bicep"], pk: {}, links: ["abs", "entra", "connections"], doc: L + "provision-with-agent-plugin" },
+  { id: "deploy", n: "Deployment", L: "ops", ring: null,
+    what: "An agent is a web app. Deploy it to App Service (zip or Visual Studio publish), to containers or with the Toolkit. Then set the Azure Bot messaging endpoint and upload a Teams or Copilot app manifest.",
+    why: "Use the hosting you already run. Nothing about it is specific to agents.",
+    types: ["App Service", "Containers", "App manifest"], pk: {}, links: ["abs", "webhosts", "ch-teams", "ch-copilot"], doc: L + "deploy-azure-bot-service-manually" },
+  { id: "prodready", n: "Production readiness", L: "ops", ring: null,
+    what: "A contract and control matrix shared by all three languages. It covers inbound JWT checks, the opt-in outbound host validator (anti-SSRF), secrets, durable state, HTTP limits, traffic protection, observability and operations. Maturity goes from code-hardened to deployment-ready to production-verified.",
+    why: "Turns “it works on my laptop” into evidence that the agent is safe to run in production.",
+    types: ["OutboundHostValidator", "readiness matrix", "control IDs"], pk: {},
+    links: ["adapter", "storage", "telemetry", "connections", "files"], doc: L + "production-ready-agent/production-ready-agent" },
+];
+const MOD = Object.fromEntries(MODULES.map((m) => [m.id, m]));
+const LAYER = Object.fromEntries(LAYERS.map((l) => [l.id, l]));
+// make links bidirectional so "connects to" is complete from either side
+for (const m of MODULES) for (const t of m.links) { const o = MOD[t]; if (o && !o.links.includes(m.id)) o.links.push(m.id); }
+
+// Narrative data for every section except the module catalog.
+const HERO_STATS = [
+  [String(MODULES.length), "modules mapped"], [String(LAYERS.length), "layers"], ["3", "languages"],
+  ["5", "activity types"], ["3", "state scopes"], ["9", "Teams feature areas"],
+];
+
+const PROBLEMS = [
+  { ic: "⇄", c: "--purple", t: "Works in more than one place", p: "Teams, Copilot, your website, Slack, Facebook. Each has its own message format, auth and protocol.", a: "A **channel abstraction**: write the logic once and the SDK translates activities to and from each channel.", m: ["activity", "adapter", "abs"] },
+  { ic: "◎", c: "--pink", t: "Not locked into one AI service", p: "The model and orchestrator you pick today will change. Frameworks that bake one in force rewrites.", a: "**AI-agnostic** by design. Plug in Foundry, OpenAI, Semantic Kernel, Agent Framework, LangChain or Copilot Studio.", m: ["sk", "af", "models"] },
+  { ic: "▦", c: "--mint", t: "Conversation state is hard", p: "Follow-ups, references to earlier turns, conversations resumed tomorrow, on any server instance.", a: "**Turns + state + storage**. State loads before your handler and saves after it.", m: ["tstate", "storage"] },
+];
+const IS = [
+  "A framework for building conversational agents: receive, route, respond",
+  "A channel abstraction built on the Activity Protocol",
+  "Built-in turn, state and storage management",
+  "Authentication for the agent, the user (OAuth/OBO) and agentic identities",
+  "The evolution of the Azure Bot Framework SDK",
+];
+const ISNT = [
+  "Not an AI model: it never decides what the agent says",
+  "Not an orchestration engine: bring Semantic Kernel, Agent Framework or LangChain",
+  "Not a no-code builder: that's Copilot Studio",
+  "Not the Agent 365 SDK: that adds governance to an agent you already have",
+];
+
+/* ---------- sequence: one turn ---------- */
+const LANES = [
+  { id: "user", t: "User", c: "--fg-2" }, { id: "ch", t: "Teams", c: "--purple" }, { id: "abs", t: "Azure Bot", c: "--indigo" },
+  { id: "host", t: "Host · Adapter", c: "--teal" }, { id: "app", t: "AgentApplication", c: "--blue" }, { id: "logic", t: "Your handler", c: "--blue" },
+  { id: "ai", t: "Orchestrator", c: "--pink" }, { id: "store", t: "Storage", c: "--mint" },
+];
+const ITEMS = [
+  { g: "INBOUND" },
+  { f: "user", to: "ch", l: "types question", t: "The user asks", p: "The user types “What changed in my order 4521?” in a Teams chat with the agent.", m: ["ch-teams"] },
+  { f: "ch", to: "abs", l: "Activity · message", t: "Teams creates an Activity", p: "Teams turns the message into an Activity: `type: message`, `channelId: msteams`, plus `from`, `conversation`, `text` and Teams `channelData`.", m: ["activity"] },
+  { f: "abs", to: "host", l: "POST /api/messages + JWT", t: "Azure Bot Service relays it", p: "Azure Bot Service POSTs the activity to your messaging endpoint with a signed JWT. The token is from the channel, not from the user.", m: ["abs"] },
+  { f: "host", to: "app", l: "TurnContext", t: "The adapter authenticates and builds a TurnContext", p: "`CloudAdapter` validates the token's signature, audience and issuer, creates a TurnContext around the activity, and runs middleware such as logging and transcripts.", m: ["adapter", "connections", "middleware", "ctx"] },
+  { g: "TURN PIPELINE" },
+  { f: "app", to: "store", l: "load TurnState", t: "State loads automatically", p: "Before any handler runs, AgentApplication reads the conversation and user buckets from storage. Keys look like `msteams/conversations/<id>`.", m: ["tstate", "storage"] },
+  { f: "store", to: "app", l: "conversation · user", kind: "resp", t: "State is ready", p: "The TurnState has Conversation, User and Temp scopes. If an attachment arrived, downloaders have already put it in `Temp.InputFiles`.", m: ["tstate", "files"] },
+  { f: "app", to: "logic", l: "BeforeTurn → route match", t: "Hooks run, then routing picks one handler", p: "`OnBeforeTurn` runs, and can abort the turn. Routes are checked in order: agentic invoke, invoke, agentic, then everything else, by rank. The first match wins.", m: ["middleware", "routing", "app"] },
+  { f: "logic", to: "abs", l: "get user token", t: "The handler needs the user's identity", p: "This route has an OAuth handler, so the handler asks for a token. If the user hasn't signed in, a sign-in card is sent instead.", m: ["userauth"] },
+  { f: "abs", to: "logic", l: "token (or OBO exchange)", kind: "resp", t: "Token Service returns the token", p: "The Azure Bot Token Service returns the user token. You can exchange it On-Behalf-Of for an API-specific token, for example to call an orders API or Graph.", m: ["userauth", "entra"] },
+  { g: "THINK & RESPOND" },
+  { f: "logic", to: "ai", l: "prompt + history + tools", t: "Your brain takes over", p: "The handler calls your orchestrator, for example a Semantic Kernel `Kernel` or an Agent Framework `ChatClientAgent`, with chat history from conversation state and tools that use the user token.", m: ["sk", "af", "models"] },
+  { f: "logic", to: "abs", l: "informative update", t: "The user sees progress straight away", p: "`StreamingResponse.QueueInformativeUpdateAsync(\"Looking up your order…\")` is sent at once, and typing indicators keep running.", m: ["streaming"] },
+  { f: "ai", to: "logic", l: "token stream", kind: "resp", t: "The model streams tokens", p: "Chunks arrive from the model. Your code queues them with `QueueTextChunk()`, and the SDK throttles updates (about 1 s per update for Teams).", m: ["streaming", "models"] },
+  { f: "logic", to: "abs", l: "final message + citations", t: "The stream ends with sources", p: "`EndStreamAsync()` sends the final message. `[doc1]` markers become numbered citations in `entities`, and feedback buttons are added.", m: ["streaming", "feedback"] },
+  { f: "abs", to: "ch", l: "deliver activity", kind: "resp", t: "Azure Bot Service delivers it to Teams", p: "Outbound calls go through the Connector client to the activity's `serviceUrl`. With the outbound host validator turned on, unknown hosts are refused.", m: ["abs", "prodready"] },
+  { f: "ch", to: "user", l: "answer with citations", kind: "resp", ui: 1, t: "The user reads the answer", p: "Teams renders the streamed answer, with citation pop-ups and thumbs-up and thumbs-down buttons.", m: ["ch-teams", "feedback"] },
+  { g: "AFTER TURN" },
+  { f: "app", to: "store", l: "save TurnState", t: "State saves automatically", p: "`OnAfterTurn` runs (return false to skip saving), then the changed conversation and user state is written back. Telemetry spans such as `agents.app.run` close.", m: ["tstate", "storage", "telemetry"] },
+  { f: "host", to: "abs", l: "HTTP 200", kind: "resp", t: "The turn ends", p: "The TurnContext is disposed. The next message might be handled by a different instance, which is why state lives in storage.", m: ["ctx", "adapter"] },
+];
+const GROUP_NAMES = ["Inbound", "Turn pipeline", "Think & respond", "After turn"];
+
+/* ---------- routing ---------- */
+const TIERS = [
+  ["1", "Agentic invoke routes", "Invokes from agentic (Agent 365) identities"],
+  ["2", "Invoke routes", "Card actions, OAuth callbacks and other time-sensitive invokes"],
+  ["3", "Agentic routes", "Agent-identity messages and events"],
+  ["4", "All other routes", "Messages, events, conversation updates…"],
+];
+const RANKS = [["RouteRank.First", "0", "Evaluated first in its group"], ["Unspecified", "32767", "Default"], ["RouteRank.Last", "65535", "Catch-all fallback"]];
+const SELECTORS = [
+  ["T", "Exact text", "`OnMessage(\"help\")`, case-insensitive"],
+  [".*", "Regular expression", "`^order\\s+\\d+$`"],
+  ["◇", "Activity type", "`OnActivity(ActivityTypes.Event)`"],
+  ["+", "Conversation update", "members added or removed"],
+  ["▭", "Card actions", "`Action.Execute` verb, `Action.Submit`, search"],
+  ["ƒ", "Custom predicate", "any condition on the TurnContext"],
+];
+const PIPE = [
+  ["Middleware (in)", "--teal"], ["Load TurnState", "--mint"], ["OnBeforeTurn", "--blue"], ["Route match", "--blue"],
+  ["Your handler", "--pink"], ["OnAfterTurn", "--blue"], ["Save TurnState", "--mint"], ["Middleware (out)", "--teal"],
+];
+const CODE = {
+  net: [
+    "// Program.cs  ·  Microsoft.Agents.Builder + Microsoft.Agents.Hosting.AspNetCore",
+    "public class EchoAgent : AgentApplication",
+    "{",
+    "   public EchoAgent(AgentApplicationOptions options) : base(options)",
+    "   {",
+    "      OnConversationUpdate(ConversationUpdateEvents.MembersAdded, WelcomeMessageAsync);",
+    "      OnActivity(ActivityTypes.Message, OnMessageAsync, rank: RouteRank.Last);",
+    "   }",
+    "   private async Task OnMessageAsync(ITurnContext turnContext, ITurnState turnState, CancellationToken ct)",
+    "      => await turnContext.SendActivityAsync($\"You said: {turnContext.Activity.Text}\", cancellationToken: ct);",
+    "   // WelcomeMessageAsync omitted",
+    "}",
+    "",
+    "var builder = WebApplication.CreateBuilder(args);",
+    "builder.Services.AddHttpClient();",
+    "builder.AddAgentApplicationOptions();",
+    "builder.AddAgent<EchoAgent>();                               // registers CloudAdapter + agent",
+    "builder.Services.AddSingleton<IStorage, MemoryStorage>();    // swap for Cosmos/Blob in prod",
+    "var app = builder.Build();",
+    "app.MapPost(\"/api/messages\", (HttpRequest req, HttpResponse res, IAgentHttpAdapter adapter, IAgent agent, CancellationToken ct)",
+    "    => adapter.ProcessAsync(req, res, agent, ct));",
+    "app.Run();",
+  ].join("\n"),
+  js: [
+    "// index.mjs  ·  @microsoft/agents-hosting + @microsoft/agents-hosting-express",
+    "import { startServer } from '@microsoft/agents-hosting-express'",
+    "import { AgentApplication, MemoryStorage } from '@microsoft/agents-hosting'",
+    "",
+    "class EchoAgent extends AgentApplication {",
+    "  constructor (storage) {",
+    "    super({ storage })",
+    "    this.onConversationUpdate('membersAdded', this._help)",
+    "    this.onMessage('/help', this._help)",
+    "    this.onActivity('message', this._echo)",
+    "  }",
+    "  _help = async context => await context.sendActivity('Type /help or send a message.')",
+    "  _echo = async (context, state) => {",
+    "    let counter = state.getValue('conversation.counter') || 0   // TurnState · conversation scope",
+    "    await context.sendActivity(`[${counter++}] You said: ${context.activity.text}`)",
+    "    state.setValue('conversation.counter', counter)               // saved after the turn",
+    "  }",
+    "}",
+    "",
+    "startServer(new EchoAgent(new MemoryStorage()))                 // Express on :3978/api/messages",
+  ].join("\n"),
+  py: [
+    "# app.py  ·  microsoft-agents-hosting-core + microsoft-agents-hosting-aiohttp",
+    "from microsoft_agents.hosting.core import AgentApplication, TurnState, TurnContext, MemoryStorage",
+    "from microsoft_agents.hosting.aiohttp import CloudAdapter",
+    "from start_server import start_server   # small aiohttp helper from the quickstart",
+    "",
+    "AGENT_APP = AgentApplication[TurnState](storage=MemoryStorage(), adapter=CloudAdapter())",
+    "",
+    "async def _help(context: TurnContext, _: TurnState):",
+    "    await context.send_activity(\"Type /help or send a message.\")",
+    "",
+    "AGENT_APP.conversation_update(\"membersAdded\")(_help)",
+    "AGENT_APP.message(\"/help\")(_help)",
+    "",
+    "@AGENT_APP.activity(\"message\")",
+    "async def on_message(context: TurnContext, _):",
+    "    await context.send_activity(f\"you said: {context.activity.text}\")",
+    "",
+    "if __name__ == \"__main__\":",
+    "    start_server(AGENT_APP, None)            # None = anonymous, local testing only",
+  ].join("\n"),
+};
+
+/* ---------- state ---------- */
+const STATE_FLOW = [
+  { t: "AgentApplication", s: "loads before · saves after", c: "--blue", m: "app" },
+  { t: "TurnState", s: "Conversation · User · Temp", c: "--blue", m: "tstate" },
+  { t: "State management", s: "typed properties in scoped buckets", c: "--mint", m: "tstate" },
+  { t: "IStorage", s: "Memory · Blob · Cosmos · custom", c: "--mint", m: "storage" },
+];
+const SCOPES = [
+  { t: "Conversation", c: "--blue", key: "{channelId}/conversations/{conversation.id}#prop", p: "Shared by everyone in a conversation and kept between turns.", use: ["What the agent just asked", "Current topic", "Chat history for your orchestrator"] },
+  { t: "User", c: "--purple", key: "{channelId}/users/{from.id}#prop", p: "One user across all their conversations on one channel. The same person on two channels counts as two users.", use: ["Name and preferences", "Last conversation summary", "Products they asked about"] },
+  { t: "Temp", c: "--orange", key: "never persisted", p: "Only for the current turn. Never saved.", use: ["Downloaded input files", "Values passed between middleware and the handler", "Scratch data"] },
+];
+const STORES = [
+  ["MemoryStorage", "Built in", "Local development and tests", "Lost on restart; one instance only"],
+  ["Azure Blob Storage", "Blobs / storage-blob", "State and transcripts", "Use a TokenCredential, not a connection string, in prod"],
+  ["Azure Cosmos DB (partitioned)", "CosmosDb / storage-cosmos", "Production, global scale", "Partitioned NoSQL container"],
+  ["Custom", "implement IStorage", "Anything else", "Read · Write · Delete by key"],
+];
+
+/* ---------- identity ---------- */
+const ID_CARDS = [
+  { t: "Agent identity", c: "--orange", q: "“Is this call really from Azure Bot Service, and who am I when I reply?”", a: "Named **connections** configured with MSAL or the Entra sidecar. Inbound JWTs are validated by the adapter, and outbound calls use the agent's own token.", m: ["connections", "adapter", "sidecar"] },
+  { t: "User identity", c: "--blue", q: "“Act as Priya when you read her mail.”", a: "**OAuth handlers** mapped one-to-one to Azure Bot OAuth connections. The Token Service handles sign-in, and **OBO** swaps the token for API-specific scopes.", m: ["userauth", "abs", "entra"] },
+  { t: "Agentic identity", c: "--purple", q: "“Act as myself: a governed agent with its own Entra Agent ID.”", a: "**AgenticAuthorization** gets instance or agentic-user tokens. Agentic routes have their own priority tier, and this is the bridge to Agent 365.", m: ["agentic", "sidecar", "routing"] },
+];
+const CREDS = [
+  ["Client secret (single or multitenant)", "Local dev, dev tunnels", "Avoid in production"],
+  ["Certificate (thumbprint or subject name + issuer)", "Self-hosted, on-premises", "Good"],
+  ["User-assigned managed identity", "Azure-hosted agents", "Recommended"],
+  ["System-assigned managed identity", "Single Azure resource", "Recommended"],
+  ["Federated credentials", "Teams SSO, secretless", "Recommended"],
+  ["Workload identity", "AKS and Kubernetes", "Recommended"],
+  ["Entra auth sidecar", "Credential-free agent code", "Recommended"],
+];
+const OAUTH_KV = [
+  ["Auto sign-in", "Every activity (or a filtered subset) gets a token. .NET only."],
+  ["Per-route", "Only marked routes acquire tokens, and different routes can use different connections. The only option in JS and Python."],
+  ["OBO", "Set `OBOConnectionName` and `OBOScopes`, or call `ExchangeTurnTokenAsync` at runtime."],
+  ["1 : 1", "One Azure Bot OAuth connection maps to one handler, for example `graph` and `github`."],
+  ["Defaults", "Sign-in card title “Sign In”, 15-minute timeout, 2 retries for a bad code (.NET)."],
+];
+
+/* ---------- brain ---------- */
+const BRAINS = {
+  sk: { n: "Semantic Kernel", c: "--pink", lines: ["Register once: `builder.Services.AddKernel()`", "Inject `Kernel` into your AgentApplication subclass", "Plugins: classes with `[KernelFunction, Description(…)]`", "History: `turnState.Conversation.GetValue(\"conversation.chatHistory\", () => new ChatHistory())`", "Keep the SK agent in its own class and call it from handlers"], s: "semantic-kernel-multiturn (.NET, Python)" },
+  af: { n: "Agent Framework", c: "--purple", lines: ["Register an `IChatClient` singleton (for example `AzureOpenAIClient(...).GetChatClient(deployment).AsIChatClient()`)", "Wrap it in a `ChatClientAgent` with name, instructions and `ChatOptions`", "Tools: `AIFunctionFactory.Create(...)` with `[Description]`", "One thread per `conversation.id`, then `RunAsync(text, thread)`", "No Kernel object: the chat client takes its place"], s: "Agent Framework (.NET, Python)" },
+  lc: { n: "LangChain", c: "--green", lines: ["Build your LangChain chain or agent as usual", "Call it from an `onMessage` / `onActivity` handler", "Store memory in conversation state or your own store", "Stream tokens back with StreamingResponse"], s: "langchain-multiturn (JavaScript)" },
+  cs: { n: "Copilot Studio", c: "--indigo", lines: ["Maker builds the agent in Copilot Studio", "Call it with `CopilotClient` (EnvironmentId + SchemaName)", "Or reach it through OBO with the user's token", "Or let Copilot Studio call *your* agent as a skill"], s: "copilotstudio-client · copilotstudio-skill · obo-authorization" },
+  gh: { n: "GitHub Copilot SDK", c: "--teal", lines: ["Use the GitHub Copilot SDK as the reasoning engine", "The Agents SDK still handles channels, state and auth", "Shows that the SDK doesn't care which brain you use"], s: "copilot-sdk “Dungeon Scribe” (.NET, Python)" },
+};
+const PLUG = [
+  "The **host** registers the adapter, storage, options and your agent, plus singletons for the orchestrator (`Kernel` or `IChatClient`).",
+  "A **route** matches the activity and calls your handler with `TurnContext` and `TurnState`.",
+  "The handler reads **chat history** from conversation state and the **user token** from UserAuthorization.",
+  "It calls the **orchestrator**, which calls the model and tools.",
+  "The answer goes back through **StreamingResponse**, with citations and feedback.",
+  "Updated history is written to state, and **saved automatically** after the turn.",
+];
+
+/* ---------- channels ---------- */
+const CH_COLS = ["Teams", "M365 Copilot", "Web Chat / Direct Line", "Slack · Facebook · others"];
+const CH_ROWS = [
+  ["Message activities", "y", "y", "y", "y"],
+  ["Adaptive Cards", "y", "p", "y", "p"],
+  ["Invoke (task modules, card actions)", "y", "p", "y", "p"],
+  ["Streaming responses", "y", "r", "y", "n"],
+  ["Citations in entities", "y", "y", "p", "n"],
+  ["Typing indicator", "y", "p", "y", "p"],
+  ["Update / delete messages", "y", "p", "y", "p"],
+  ["Custom channelData", "y", "p", "y", "p"],
+  ["Typed extension", "Teams ext.", "—", "Named pipes", "Slack ext."],
+];
+const TEAMS = [
+  ["Meetings", "Start, end, participants join and leave; meeting and participant APIs. Needs the RSC permission `OnlineMeeting.ReadBasic.Chat`.", "TeamsMeetingStartRoute"],
+  ["Task modules", "Modal dialogs showing a card or a webpage. Fetch, submit, and chain with `Continue`.", "TeamsTaskFetchRoute"],
+  ["Feedback", "AI citations, thumbs-up and thumbs-down, text feedback and message reactions.", "OnFeedbackLoop"],
+  ["Message extensions", "Search (query and select item), action commands, link unfurling, message preview and settings.", "TeamsQueryRoute"],
+  ["Files & consent", "Receive files as attachments. Ask for consent to upload to OneDrive (personal chat only).", "IInputFileDownloader"],
+  ["Messages", "Targeted (private) messages with Prompt Preview, quoted replies, slash commands and suggested actions.", "SendTargetedActivityAsync"],
+  ["Channels", "Channel created, renamed, deleted, restored, shared, and members added or removed.", "onChannelEventReceived"],
+  ["Teams lifecycle", "Team archived, renamed, restored; get team details and channels.", "onTeamEventReceived"],
+  ["Conversation members", "Roster lookup through the Teams API client: get one member, page through all, or query a team.", "context.client"],
+];
+const PRO_OPS = [
+  ["SendActivity", "One message to an existing conversation. No routing, no state. Fire and forget.", "--blue"],
+  ["ContinueConversation", "Runs a handler inside the conversation with full TurnContext, TurnState, middleware and OAuth tokens.", "--purple"],
+  ["CreateConversation", "Asks the channel to open a new conversation, then optionally continues it straight away.", "--green"],
+];
+const TRIGGERS = {
+  int: [{ t: "User asks for something slow", p: "The agent stores the conversation with `StoreConversationAsync` and queues a background task in the same process.", c: ["Proactive", "IStorage"] }, { t: "Task finishes", p: "The background task uses the stored conversation to call `SendActivity` or `ContinueConversation`.", c: ["Continue"] }, { t: "User is notified", p: "No external service is involved. You need durable storage so the reference survives a restart.", c: [] }],
+  ext: [{ t: "User asks for something slow", p: "The agent sends the conversation reference and job details to an external service such as Functions or Service Bus.", c: ["Conversation"] }, { t: "External service finishes", p: "It calls the agent's proactive HTTP endpoint (`MapAgentProactiveEndpoints`) with the result.", c: ["HTTP endpoint"] }, { t: "Continuation handler runs", p: "A `[ContinueConversation]` handler runs with full agent logic and replies to the user.", c: ["ContinueConversation"] }],
+};
+
+/* ---------- lifecycle ---------- */
+const LIFE = {
+  build: [
+    { t: "Scaffold", p: "Start with the **Microsoft 365 Agents Toolkit** in VS or VS Code, clone a sample from `microsoft/Agents`, or follow the CLI quickstart.", c: ["Agents Toolkit", "samples/"] },
+    { t: "Write the AgentApplication", p: "Register routes, choose storage, add OAuth handlers and the Teams extension if you need them.", c: ["AgentApplication", "IStorage"] },
+    { t: "Test locally in Agents Playground", p: "Anonymous mode needs no setup. The agent listens on `localhost:3978/api/messages`.", c: ["agentsplayground"] },
+    { t: "Unit test", p: "`AgentTestHost` + `TestFlow` for multi-turn, OAuth and middleware tests. `SemanticValidator` checks AI answers by meaning.", c: ["Builder.Testing", "microsoft-agents-testing"] },
+    { t: "Test in a real channel", p: "A **dev tunnel** exposes localhost. Point the Azure Bot messaging endpoint at it and test in Teams or Copilot.", c: ["devtunnel"] },
+  ],
+  ship: [
+    { t: "Provision the Azure Bot", p: "Choose the identity type (client secret, user-assigned managed identity, or federated credentials for Teams SSO). Do it by hand or with the **agents-sdk-provision** plugin skill.", c: ["Azure Bot", "Entra app"] },
+    { t: "Configure connections", p: "Match the agent's `Connections` / `ConnectionsMap` to the Azure Bot identity. Add OAuth connections for user sign-in.", c: ["MSAL", "sidecar"] },
+    { t: "Switch to durable storage", p: "Cosmos DB or Blob, using a `TokenCredential` from a connection. Never fall back to memory storage in production.", c: ["Cosmos", "Blob"] },
+    { t: "Deploy the web app", p: "App Service (zip or VS publish), containers or the Toolkit. Set the messaging endpoint to `https://<app>/api/messages`.", c: ["App Service", "Containers"] },
+    { t: "Publish to Teams / Copilot", p: "Build and upload the app manifest. Teams features such as file support or targeted messages need specific manifest entries.", c: ["manifest.json"] },
+    { t: "Harden and observe", p: "Work through the production-readiness matrix: JWT checks, outbound host validator, payload limits, OTel export, alerts and rollback.", c: ["readiness matrix", "OTLP"] },
+  ],
+  migrate: [
+    { t: "Swap packages", p: "BotBuilder packages become `Microsoft.Agents.*`, `@microsoft/agents-*` and `microsoft-agents-*`. Rename imports and types.", c: ["NuGet", "npm", "PyPI"] },
+    { t: "ActivityHandler → AgentApplication", p: "Override methods become routes such as `OnMessage`, `OnConversationUpdate` and `OnActivity`. `TeamsActivityHandler` isn't supported, so use the Teams extension.", c: ["routes"] },
+    { t: "BotFrameworkAdapter → CloudAdapter", p: "BotFrameworkAdapter has been removed. Configure `Connections` for MSAL-based auth.", c: ["CloudAdapter"] },
+    { t: "State & serialisation", p: "State moves to TurnState scopes. .NET moves to System.Text.Json.", c: ["TurnState", "System.Text.Json"] },
+    { t: "Replace removed pieces", p: "LUIS, QnA Maker, Adaptive Dialogs, LG and Composer artefacts aren't carried over. Use LLM orchestration instead.", c: ["LLM"] },
+  ],
+};
+const MATURITY = [
+  ["Code-hardened", "--orange", "The controls that apply exist in source, and local checks pass."],
+  ["Deployment-ready", "--blue", "Infrastructure, configuration, smoke tests, rollback and operator docs exist."],
+  ["Production-verified", "--green", "The deployed environment has passed security, recovery, telemetry, alert, traffic, smoke and rollback checks."],
+];
+const REQ_CONTROLS = [
+  "Inbound auth: check signature, lifetime, exact audience, issuer and tenant. Channel identity is not user identity.",
+  "Agent-to-agent endpoints: authorise the caller's `azp`/`appid` against an allow list.",
+  "Outbound: turn on the opt-in host validator (anti-SSRF) and compare `serviceUrl` with the verified claim.",
+  "Secrets: fail startup on missing or unsafe values. Prefer managed identity, workload identity or certificates.",
+  "State: durable storage, schema version, retention, reject stale writes, no full-turn replay.",
+  "HTTP: limit payload size, return generic errors, limit timeouts and retries, make side effects idempotent, drain work on shutdown.",
+  "Traffic protection: a caller-aware edge. Connector IP limiting isn't per-user rate limiting.",
+  "Observability: count turns, failures, latency and auth rejections. Never export prompts or tokens.",
+];
+const COND_CONTROLS = [
+  "Delegated APIs: minimal scopes, consent paths, sign-out, token redaction",
+  "Attachments: type and size checks, malware policy, retention",
+  "Proactive and long-running work: durable references, idempotency, authorised cancellation",
+  "Models and retrieval: separate trusted instructions from user input, check provenance, set cost limits, run evaluations",
+  "Tools: typed validation, allow lists, least privilege, approval for high-impact actions",
+];
+const BF_GONE = [
+  ["BotFrameworkAdapter", "Removed", "CloudAdapter"],
+  ["ActivityHandler", "Replaced", "AgentApplication routes (ActivityHandler still supported in JS)"],
+  ["Adaptive Dialogs · Composer artefacts", "Not carried over", "LLM orchestration, or waterfall dialogs through Dialogs"],
+  ["LUIS · QnA Maker · Orchestrator · LU · LG", "Retired", "LLMs with Semantic Kernel or Agent Framework"],
+  ["Application Insights (legacy telemetry)", "Replaced", "OpenTelemetry-based telemetry"],
+  ["ASP.NET WebAPI (classic)", "Not supported", "ASP.NET Core"],
+  ["bf CLI · Yeoman generators", "Deprecated", "Microsoft 365 Agents Toolkit"],
+  ["QueueStorage · payment activities", "Removed", "Cloud-native messaging"],
+];
+
+/* ---------- ecosystem ---------- */
+const ECO = [
+  { t: "Microsoft 365 Agents SDK", c: "--blue", tag: "this page", p: "Builds conversational agents: channels, activities, turns, state and auth. Pro-code, in C#, JS and Python." },
+  { t: "Microsoft Agent 365 SDK", c: "--purple", tag: "governance", p: "Doesn't build agents. It adds Entra agent identity, governed Work IQ (MCP) tools and notifications to an agent you already run. It works with the Agents SDK." },
+  { t: "Microsoft Agent Framework", c: "--pink", tag: "orchestrator", p: "Semantic Kernel and AutoGen combined: the reasoning and tool-calling engine you put inside a handler." },
+  { t: "Copilot Studio", c: "--indigo", tag: "low-code", p: "A SaaS agent builder for makers. The Agents SDK can call its agents (client library) or be called by them (skills)." },
+  { t: "Microsoft 365 Agents Toolkit", c: "--teal", tag: "tooling", p: "VS and VS Code extension for scaffolding, debugging, provisioning and publishing. Replaces the Bot Framework generators." },
+  { t: "Azure Bot Service", c: "--orange", tag: "relay", p: "The channel connector and OAuth Token Service your agent registers with. Not a runtime: your code runs wherever you host it." },
+];
+const ROAD = [
+  ["Activity Protocol & TurnContext", "Every field, every activity type, channelData by channel", ["activity", "ctx"]],
+  ["AgentApplication & routing", "Selectors, ranks, hooks, middleware, extensions", ["app", "routing", "middleware"]],
+  ["State, storage & memory design", "Scopes, keys, Cosmos partitioning, chat-history patterns", ["tstate", "storage"]],
+  ["Identity end to end", "Connections, Azure Bot OAuth, OBO, agentic and sidecar", ["connections", "userauth", "agentic"]],
+  ["Bring your brain", "Semantic Kernel vs Agent Framework inside a handler, streaming", ["sk", "af", "streaming"]],
+  ["Teams extension deep dive", "Nine feature areas, manifest and invoke responses", ["teams", "cards"]],
+  ["Proactive & long-running work", "Store, continue, create; external triggers", ["proactive"]],
+  ["Multi-agent", "Agent client, Copilot Studio, A2A", ["agentclient", "csclient", "a2a"]],
+  ["Testing & telemetry", "TestFlow, SemanticValidator, OTel spans and dashboards", ["tests", "telemetry"]],
+  ["Ship to production", "Provision, deploy, readiness matrix", ["provision", "deploy", "prodready"]],
+];
+const SOURCES = [
+  ["What is the Microsoft 365 Agents SDK", "https://learn.microsoft.com/microsoft-365/agents-sdk/agents-sdk-overview"],
+  ["Activity Protocol", "https://learn.microsoft.com/microsoft-365/agents-sdk/activity-protocol"],
+  ["AgentApplication", "https://learn.microsoft.com/microsoft-365/agents-sdk/agent-application"],
+  ["Manage state · Storage", "https://learn.microsoft.com/microsoft-365/agents-sdk/state-concepts"],
+  ["Configure authentication (MSAL)", "https://learn.microsoft.com/microsoft-365/agents-sdk/configure-authentication-msal"],
+  ["Configure OAuth / OBO", "https://learn.microsoft.com/microsoft-365/agents-sdk/agent-oauth-configuration"],
+  ["Semantic Kernel & Agent Framework", "https://learn.microsoft.com/microsoft-365/agents-sdk/using-semantic-kernel-agent-framework"],
+  ["Teams extension", "https://learn.microsoft.com/microsoft-365/agents-sdk/teams/teams-extension"],
+  ["Proactive messaging", "https://learn.microsoft.com/microsoft-365/agents-sdk/proactive-overview"],
+  ["Adaptive Cards", "https://learn.microsoft.com/microsoft-365/agents-sdk/adaptive-cards"],
+  ["Telemetry reference", "https://learn.microsoft.com/microsoft-365/agents-sdk/agent-telemetry"],
+  ["Prepare an agent for production", "https://learn.microsoft.com/microsoft-365/agents-sdk/production-ready-agent/production-ready-agent"],
+  ["Bot Framework migration guidance", "https://learn.microsoft.com/microsoft-365/agents-sdk/bf-migration-guidance"],
+  [".NET reference · packages", "https://learn.microsoft.com/dotnet/api/copilot-sdk-docs-dotnet/overview"],
+  ["JavaScript reference · packages", "https://learn.microsoft.com/javascript/api/overview/agents-overview"],
+  ["Python reference · packages", "https://learn.microsoft.com/python/api/agent-sdk-python/agents-overview"],
+  ["Agent 365 SDK vs Agents SDK", "https://learn.microsoft.com/microsoft-agent-365/developer/agent-365-sdk"],
+  ["GitHub: microsoft/Agents (samples)", "https://github.com/microsoft/Agents"],
+  ["GitHub: Agents-for-net (A2A, sidecar, SharePoint, client)", "https://github.com/microsoft/Agents-for-net"],
+];
+
+// Page part 1: shared helpers, atom (orbital map), module detail panel, layer stack.
+const { $, $$, esc, fmt } = UI;
+const NS = "http://www.w3.org/2000/svg";
+const sv = (p, tag, a = {}) => { const n = document.createElementNS(NS, tag); for (const k in a) n.setAttribute(k, a[k]); p.appendChild(n); return n; };
+const colorOf = (m) => LAYER[m.L].c;
+const chip = (id) => { const m = MOD[id]; return m ? `<button type="button" class="mchip" data-mod="${esc(id)}" style="--c:var(${colorOf(m)})">${esc(m.n)}</button>` : ""; };
+const LANG = [["net", ".NET"], ["js", "JS"], ["py", "Python"]];
+
+/* ---------- atom geometry ---------- */
+const CX = 580, CY = 360;
+const SHORT = {
+  activity: "Activity", app: "AgentApplication", ctx: "TurnContext", tstate: "TurnState",
+  routing: "Routing", middleware: "Middleware · hooks", adapter: "CloudAdapter", connections: "Connections",
+  userauth: "User OAuth · OBO", storage: "IStorage", streaming: "Streaming", files: "Input files",
+  cards: "Adaptive Cards", proactive: "Proactive", feedback: "Citations · feedback", teams: "Teams extension",
+  slack: "Slack extension", sharepoint: "SharePoint ext.", a2a: "A2A · preview", agentclient: "Agent client",
+  csclient: "Copilot Studio client", dialogs: "Dialogs", transcript: "Transcripts", telemetry: "Telemetry",
+  "ch-teams": "Teams", "ch-copilot": "M365 Copilot", "ch-webchat": "Web Chat", "ch-3p": "Slack · 3P channels",
+  abs: "Azure Bot Service", entra: "Entra ID", sk: "Semantic Kernel", af: "Agent Framework", langchain: "LangChain",
+  models: "Foundry · OpenAI", mcs: "Copilot Studio", dbs: "Cosmos · Blob", otelbe: "OTel backends", graph: "Graph · Copilot APIs",
+};
+const RINGS = [
+  null,
+  { rx: 250, ry: 165, start: 22.5, order: ["middleware", "storage", "files", "streaming", "adapter", "connections", "userauth", "routing"], lbl: "CORE SERVICES" },
+  { rx: 390, ry: 245, start: 0, order: ["proactive", "dialogs", "transcript", "telemetry", "feedback", "slack", "teams", "cards", "a2a", "agentclient", "csclient", "sharepoint"], lbl: "CAPABILITIES & EXTENSIONS" },
+  { rx: 500, ry: 330, start: 12.857, order: ["af", "langchain", "models", "dbs", "otelbe", "ch-3p", "ch-webchat", "ch-copilot", "ch-teams", "abs", "entra", "graph", "mcs", "sk"], lbl: "OUTSIDE WORLD" },
+];
+const POS = { app: [CX, CY], activity: [CX, 293], ctx: [490, 428], tstate: [670, 428] };
+RINGS.forEach((r) => { if (!r) return; const step = 360 / r.order.length; r.order.forEach((id, k) => { const a = (r.start + k * step) * Math.PI / 180; POS[id] = [CX + r.rx * Math.cos(a), CY + r.ry * Math.sin(a)]; }); });
+
+const atomSvg = $("#atomSvg");
+const gRings = sv(atomSvg, "g"), gEdges = sv(atomSvg, "g"), gNodes = sv(atomSvg, "g");
+sv(gRings, "ellipse", { class: "core-glow", cx: CX, cy: CY + 2, rx: 165, ry: 112 });
+RINGS.forEach((r) => { if (!r) return; sv(gRings, "ellipse", { class: "ring", cx: CX, cy: CY, rx: r.rx, ry: r.ry }); });
+// captions sit in free space: nucleus above the core, rings on the upper right of each ellipse
+[["NUCLEUS", CX, 262, "middle"], [RINGS[1].lbl, 892, 186, "end"], [RINGS[2].lbl, 1040, 120, "end"], [RINGS[3].lbl, 1090, 24, "end"]]
+  .forEach(([t, x, y, anchor]) => { sv(gRings, "text", { class: "ring-lbl", x, y, "text-anchor": anchor }).textContent = t; });
+
+const nodeEls = {};
+for (const id of Object.keys(POS)) {
+  const m = MOD[id]; if (!m) continue;
+  const [x, y] = POS[id];
+  const g = sv(gNodes, "g", { class: `an r${m.ring}`, tabindex: "0", role: "button", "aria-label": `${m.n}: show details`, style: `--c:var(${colorOf(m)})` });
+  const h = m.ring === 0 ? 40 : 32;
+  const rect = sv(g, "rect", { x, y: y - h / 2, width: 10, height: h, rx: h / 2 });
+  const dot = sv(g, "circle", { class: "dot", cx: x, cy: y, r: 4 });
+  const t = sv(g, "text", { x, y: y + 4.5, "text-anchor": "middle" }); t.textContent = SHORT[id] || m.n;
+  g.addEventListener("click", () => selectMod(id, true));
+  g.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); selectMod(id, true); } });
+  nodeEls[id] = { g, rect, dot, t, h };
+}
+function sizeNodes() {
+  for (const id in nodeEls) {
+    const { rect, dot, t, h } = nodeEls[id]; const [x, y] = POS[id];
+    const tw = t.getComputedTextLength() || (SHORT[id] || "").length * 7;
+    const w = tw + 38;
+    rect.setAttribute("x", x - w / 2); rect.setAttribute("width", w);
+    t.setAttribute("x", x + 6); dot.setAttribute("cx", x - w / 2 + 14); dot.setAttribute("cy", y);
+  }
+}
+sizeNodes();
+
+const curve = (a, b) => {
+  const [x1, y1] = POS[a], [x2, y2] = POS[b];
+  const mx = (x1 + x2) / 2, my = (y1 + y2) / 2;
+  const cx = mx + (CX - mx) * 0.35, cy = my + (CY - my) * 0.35;
+  return `M${x1},${y1} Q${cx},${cy} ${x2},${y2}`;
+};
+let edgeMode = "sel", current = "app";
+function drawEdges() {
+  gEdges.innerHTML = "";
+  const sel = MOD[current];
+  if (edgeMode === "all") {
+    const seen = new Set();
+    for (const m of MODULES) {
+      if (!POS[m.id]) continue;
+      for (const t of m.links) {
+        if (!POS[t]) continue; const k = [m.id, t].sort().join("|"); if (seen.has(k)) continue; seen.add(k);
+        const hot = sel && (m.id === sel.id || t === sel.id);
+        sv(gEdges, "path", { d: curve(m.id, t), class: `ae${hot ? " hot" : ""}`, style: `--c:var(${colorOf(sel)})` });
+      }
+    }
+  } else if (sel && POS[sel.id]) {
+    for (const t of sel.links) if (POS[t]) sv(gEdges, "path", { d: curve(sel.id, t), class: "ae hot", style: `--c:var(${colorOf(sel)})` });
+  }
+}
+
+/* ---------- detail panel ---------- */
+function detailHTML(m) {
+  const L = LAYER[m.L];
+  const pk = LANG.filter(([k]) => m.pk && m.pk[k]).length
+    ? `<h4>Packages</h4><div class="pkrows">${LANG.map(([k, n]) => { const v = m.pk[k]; return `<div><span>${n}</span>${v && v !== "—" ? `<code>${esc(v)}</code>` : `<em class="na">not listed</em>`}</div>`; }).join("")}</div>` : "";
+  return `
+    <div>
+      <div class="top"><span class="tag" style="color:var(${L.c});background:color-mix(in srgb,var(${L.c}) 14%,transparent)">${esc(L.n)}</span>${m.ring === 0 ? '<span class="tag blue">nucleus</span>' : ""}${m.preview ? '<span class="prev">preview</span>' : ""}</div>
+      <h3>${esc(m.n)}</h3>
+      <p>${fmt(m.what)}</p>
+      <div class="why-box" style="border-color:var(${L.c})"><b style="color:var(${L.c})">Why it exists:</b> ${fmt(m.why)}</div>
+      ${m.note ? `<p class="note">ⓘ ${fmt(m.note)}</p>` : ""}
+      ${m.doc ? `<a class="doc" href="${esc(m.doc)}" target="_blank" rel="noopener">Read the source doc ↗</a>` : ""}
+    </div>
+    <div>
+      <h4>Connects to (${m.links.length})</h4><div class="chips-row">${m.links.map(chip).join("")}</div>
+      <h4>Key types & APIs</h4><div class="chips-row">${m.types.map((t) => `<span class="tcode">${esc(t)}</span>`).join("")}</div>
+      ${pk}
+    </div>`;
+}
+function selectMod(id, fromUser) {
+  const m = MOD[id]; if (!m) return;
+  current = id;
+  atomSvg.classList.add("focus");
+  for (const k in nodeEls) { nodeEls[k].g.classList.toggle("sel", k === id); nodeEls[k].g.classList.toggle("lit", m.links.includes(k)); }
+  if (!POS[id]) atomSvg.classList.remove("focus");
+  $("#atomDetail").innerHTML = detailHTML(m);
+  drawEdges();
+  if (fromUser && innerWidth < 780) $("#atomDetail").scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+UI.seg("#edgeSeg", (v) => { edgeMode = v; drawEdges(); });
+$("#ringLegend").innerHTML = LAYERS.map((l) => `<span class="lr"><b style="background:var(${l.c})"></b>${esc(l.n.split(" (")[0])}</span>`).join("");
+
+// any [data-mod] chip anywhere on the page opens the module in the atom view
+document.addEventListener("click", (e) => {
+  const b = e.target.closest("[data-mod]"); if (!b) return;
+  selectMod(b.dataset.mod, true);
+  if (!b.closest("#atomDetail")) $("#atom").scrollIntoView({ behavior: "smooth", block: "start" });
+});
+
+/* ---------- layer stack ---------- */
+$("#stack").innerHTML = `<div class="stack-arrows"><span>↓ request travels down</span><span>reply climbs back up ↑</span></div>` + LAYERS.map((l, i) => {
+  const mods = MODULES.filter((m) => m.L === l.id);
+  return `<div class="band" style="--c:var(${l.c})">
+    <div class="no">L${String(i + 1).padStart(2, "0")}</div>
+    <div><h3>${esc(l.n)}</h3><p>${esc(l.d)}</p></div>
+    <div class="chips-row">${mods.map((m) => chip(m.id)).join("")}</div>
+  </div>`;
+}).join("");
+
+selectMod("app", false);
+
+// Page part 2: every other section. Ends with UI.init().
+const tagStyle = (c) => `style="color:var(${c});background:color-mix(in srgb,var(${c}) 14%,transparent)"`;
+
+/* ---------- hero + why ---------- */
+$("#heroStats").innerHTML = HERO_STATS.map(([b, s]) => `<div class="stat" role="listitem"><b>${esc(b)}</b><span>${esc(s)}</span></div>`).join("");
+$("#problems").innerHTML = PROBLEMS.map((p) => `<div class="card prob">
+  <div class="ic" style="background:var(${p.c})">${esc(p.ic)}</div><h3>${esc(p.t)}</h3><p>${esc(p.p)}</p>
+  <div class="ans">${fmt(p.a)}</div><div class="chips-row">${p.m.map(chip).join("")}</div></div>`).join("");
+$("#isList").innerHTML = IS.map((t) => `<li><span class="bx ok">✓</span><span>${esc(t)}</span></li>`).join("");
+$("#isntList").innerHTML = ISNT.map((t) => `<li><span class="bx no">✕</span><span>${esc(t)}</span></li>`).join("");
+
+/* ---------- sequence ---------- */
+const laneById = Object.fromEntries(LANES.map((l) => [l.id, l]));
+const seq = UI.sequence("#seq", {
+  lanes: LANES, items: ITEMS, width: 1160,
+  onShow(s, i, total, gi) {
+    const a = laneById[s.f], b = laneById[s.to];
+    $$("#seqJump button").forEach((x, k) => x.setAttribute("aria-pressed", String(k === gi)));
+    $("#seqPanel").innerHTML = `<div class="card">
+      <div class="n">Step ${i + 1} of ${total} · ${esc(GROUP_NAMES[gi] ?? "")}</div><h3>${esc(s.t)}</h3>
+      <div class="lanes"><span class="tag" ${tagStyle(a.c)}>${esc(a.t)}</span><span class="muted">→</span><span class="tag" ${tagStyle(b.c)}>${esc(b.t)}</span></div>
+      <p>${fmt(s.p)}</p><div class="where"><b>Modules:</b> ${s.m.map(chip).join("")}</div></div>`;
+    $("#seqPrev").disabled = i === 0; $("#seqNext").disabled = i === total - 1;
+  },
+});
+$("#seqJump").innerHTML = seq.groups.map((g, i) => `<button type="button" data-first="${g.first}">${esc(GROUP_NAMES[i] ?? g.g)}</button>`).join("");
+const setPlay = (on) => { $("#seqPlay").textContent = on ? "Pause" : "Play"; };
+$$("#seqJump button").forEach((b) => b.addEventListener("click", () => { seq.stop(setPlay); seq.show(+b.dataset.first); }));
+$("#seqPrev").addEventListener("click", () => { seq.stop(setPlay); seq.prev(); });
+$("#seqNext").addEventListener("click", () => { seq.stop(setPlay); seq.next(); });
+$("#seqPlay").addEventListener("click", () => seq.play(3200, setPlay));
+seq.show(0);
+
+/* ---------- routing ---------- */
+$("#tiers").innerHTML = TIERS.map(([n, b, s], i) => `<div class="tier" style="--w:${22 - i * 5}"><div class="b">${n}</div><div><b>${esc(b)}</b><span>${esc(s)}</span></div></div>`).join("");
+$("#ranks").innerHTML = RANKS.map(([c, v, s]) => `<div class="rank"><code>${esc(c)}</code><b>${esc(v)}</b><span>${esc(s)}</span></div>`).join("");
+$("#selectors").innerHTML = SELECTORS.map(([ic, b, s], i) => `<li><span class="ic" style="background:var(${["--blue", "--indigo", "--purple", "--teal", "--green", "--orange"][i]})">${esc(ic)}</span><div><b>${esc(b)}</b><span>${fmt(s)}</span></div></li>`).join("");
+$("#pipe").innerHTML = PIPE.map(([t, c]) => `<span class="p" style="--c:var(${c})">${esc(t)}</span>`).join("<i>→</i>");
+const showCode = (v) => {
+  const src = CODE[v];
+  const cmt = v === "py" ? "#" : "//";
+  // escape first, then dim trailing comments (only our own trusted sample strings reach here)
+  $("#codeSample").innerHTML = src.split("\n").map((ln) => {
+    const e = esc(ln); const k = ln.indexOf(cmt);
+    if (k < 0 || (v !== "py" && ln.slice(0, k).includes("http"))) return e;
+    return esc(ln.slice(0, k)) + `<span class="cm">${esc(ln.slice(k))}</span>`;
+  }).join("\n");
+};
+UI.seg("#langSeg", showCode); showCode("net");
+
+/* ---------- state ---------- */
+$("#stateFlow").innerHTML = STATE_FLOW.map((s) => `<button type="button" class="sf" data-mod="${s.m}" style="--c:var(${s.c})"><b>${esc(s.t)}</b><span>${esc(s.s)}</span></button>`).join("");
+$("#scopes").innerHTML = SCOPES.map((s) => `<div class="card scope" style="--c:var(${s.c})"><h3>${esc(s.t)} scope</h3><p>${esc(s.p)}</p><code>${esc(s.key)}</code><ul>${s.use.map((u) => `<li>${esc(u)}</li>`).join("")}</ul></div>`).join("");
+$("#storeTable").innerHTML = `<thead><tr><th>Provider</th><th>Package</th><th>Use for</th><th>Notes</th></tr></thead><tbody>${STORES.map((r) => `<tr>${r.map((c) => `<td>${esc(c)}</td>`).join("")}</tr>`).join("")}</tbody>`;
+
+/* ---------- identity ---------- */
+$("#idCards").innerHTML = ID_CARDS.map((c) => `<div class="card idc" style="--c:var(${c.c})"><h3>${esc(c.t)}</h3><p class="q">${esc(c.q)}</p><p class="a">${fmt(c.a)}</p><div class="chips-row">${c.m.map(chip).join("")}</div></div>`).join("");
+const recCls = (r) => (r === "Recommended" ? "good" : r === "Good" ? "ok" : "bad");
+$("#credTable").innerHTML = `<thead><tr><th>Agent credential type</th><th>Best for</th><th>Production</th></tr></thead><tbody>${CREDS.map(([a, b, c]) => `<tr><td>${esc(a)}</td><td>${esc(b)}</td><td><span class="rec ${recCls(c)}">${esc(c)}</span></td></tr>`).join("")}</tbody>`;
+$("#oauthKv").innerHTML = OAUTH_KV.map(([k, v]) => `<div><b>${esc(k)}</b><span>${fmt(v)}</span></div>`).join("");
+
+/* ---------- brain ---------- */
+$("#brainSeg").innerHTML = Object.entries(BRAINS).map(([k, b], i) => `<button type="button" data-v="${k}" aria-pressed="${i === 0}">${esc(b.n)}</button>`).join("");
+const showBrain = (k) => { const b = BRAINS[k]; $("#brainBody").innerHTML = `<h3 style="--c:var(${b.c})">${esc(b.n)}</h3><ol>${b.lines.map((l) => `<li>${fmt(l)}</li>`).join("")}</ol><div class="smp">Sample: <b>${esc(b.s)}</b></div>`; };
+UI.seg("#brainSeg", showBrain); showBrain("sk");
+$("#plugSteps").innerHTML = PLUG.map((p) => `<li><div>${fmt(p)}</div></li>`).join("");
+
+/* ---------- channels ---------- */
+const MX = { y: ["✓", "Supported"], p: ["◐ limited", "Limited or varies"], r: ["● required", "Required"], n: ["—", "Not supported (final message only for streaming)"] };
+$("#chanMatrix").innerHTML = `<thead><tr><th>Capability</th>${CH_COLS.map((c) => `<th>${esc(c)}</th>`).join("")}</tr></thead><tbody>${CH_ROWS.map(([cap, ...v]) => `<tr><td>${esc(cap)}</td>${v.map((x) => MX[x] ? `<td><span class="mx ${x}" title="${esc(MX[x][1])}">${esc(MX[x][0])}</span></td>` : `<td><span class="mx t">${esc(x)}</span></td>`).join("")}</tr>`).join("")}</tbody>`;
+$("#chanMatrix").insertAdjacentHTML("afterend", `<div class="mx-legend"><span><b class="mx y">✓</b> supported</span><span><b class="mx p">◐</b> limited, varies by client, or not confirmed on Learn</span><span><b class="mx r">●</b> required by the channel</span><span><b class="mx n">—</b> not supported (streaming falls back to one final message)</span><span>Based on Learn's channel notes and SDK source. Always test in each target client.</span></div>`);
+$("#teamsGrid").innerHTML = TEAMS.map(([t, p, api]) => `<div class="card tf"><h3>${esc(t)}</h3><p>${fmt(p)}</p><span class="tcode">${esc(api)}</span></div>`).join("");
+$("#proOps").innerHTML = PRO_OPS.map(([b, s, c]) => `<div class="proop" style="--c:var(${c})"><i></i><div><b>${esc(b)}</b><span>${esc(s)}</span></div></div>`).join("") + `<div class="tip"><b>Needs durable storage:</b> stored conversation references must survive restarts. Use Cosmos DB or Blob Storage in production.</div>`;
+let trig = UI.stepper("#trigSteps", TRIGGERS.int);
+UI.seg("#trigSeg", (v) => { trig = UI.stepper("#trigSteps", TRIGGERS[v]); });
+
+/* ---------- lifecycle ---------- */
+let life = UI.stepper("#lifeStepper", LIFE.build);
+const setLifePlay = (on) => { $("#lifePlay").textContent = on ? "Pause" : "Play"; };
+UI.seg("#lifeSeg", (v) => { life.stop(setLifePlay); life = UI.stepper("#lifeStepper", LIFE[v]); });
+$("#lifePlay").addEventListener("click", () => life.play(2600, setLifePlay));
+$("#maturity").innerHTML = MATURITY.map(([t, c, p], i) => `<div class="card mat" style="--c:var(${c})"><span class="lv">LEVEL ${i + 1}</span><h3>${esc(t)}</h3><p>${esc(p)}</p></div>`).join("");
+$("#reqControls").innerHTML = REQ_CONTROLS.map((t) => `<li><span class="bx ok">✓</span><span>${fmt(t)}</span></li>`).join("");
+$("#condControls").innerHTML = COND_CONTROLS.map((t) => `<li><span class="bx"></span><span>${fmt(t)}</span></li>`).join("");
+$("#bfTable").innerHTML = `<thead><tr><th>Bot Framework piece</th><th>Status</th><th>Use instead</th></tr></thead><tbody>${BF_GONE.map(([a, b, c]) => `<tr><td>${esc(a)}</td><td>${esc(b)}</td><td>${esc(c)}</td></tr>`).join("")}</tbody>`;
+
+/* ---------- atlas ---------- */
+let atlasLayer = "all";
+const FILTER_NAMES = { surf: "Surfaces", svc: "Azure relay", host: "Hosting", id: "Identity", core: "Core runtime", cap: "Capabilities", ext: "Extensions", data: "State", brain: "AI brain", ops: "Ops & tooling" };
+$("#layerFilter").innerHTML = `<button type="button" data-v="all" aria-pressed="true">All</button>` + LAYERS.map((l) => `<button type="button" data-v="${l.id}" aria-pressed="false">${esc(FILTER_NAMES[l.id])}</button>`).join("");
+const modCard = (m) => {
+  const l = LAYER[m.L];
+  const pk = LANG.filter(([k]) => m.pk && m.pk[k] && m.pk[k] !== "—");
+  return `<article class="mod" id="m-${esc(m.id)}" style="--c:var(${l.c})">
+    <div class="ly">${esc(l.n.split(" (")[0])}${m.ring === 0 ? " · nucleus" : ""}</div>
+    <h3>${esc(m.n)}${m.preview ? '<span class="prev">preview</span>' : ""}</h3>
+    <p>${fmt(m.what)}</p><p class="w"><b>Why:</b> ${fmt(m.why)}</p>
+    <div class="lbl">Key types</div><div class="types">${m.types.map((t) => `<span class="tcode">${esc(t)}</span>`).join("")}</div>
+    ${pk.length ? `<div class="lbl">Packages</div><div class="pkrows">${pk.map(([k, n]) => `<div><span>${n}</span><code>${esc(m.pk[k])}</code></div>`).join("")}</div>` : ""}
+    <div class="lbl">Connects to</div><div class="chips-row">${m.links.map(chip).join("")}</div>
+    <div class="open">${m.doc ? `<a href="${esc(m.doc)}" target="_blank" rel="noopener">Source ↗</a>` : "<span></span>"}<button type="button" data-mod="${esc(m.id)}">Show in atom →</button></div>
+  </article>`;
+};
+function renderAtlas() {
+  const q = $("#atlasSearch").value.trim().toLowerCase();
+  const list = MODULES.filter((m) => (atlasLayer === "all" || m.L === atlasLayer) &&
+    (!q || [m.n, m.what, m.why, ...m.types, ...Object.values(m.pk || {})].join(" ").toLowerCase().includes(q)));
+  $("#atlasGrid").innerHTML = list.map(modCard).join("") || `<p class="muted">No modules match “${esc(q)}”.</p>`;
+  $("#atlasCount").textContent = `${list.length} of ${MODULES.length} modules`;
+}
+UI.seg("#layerFilter", (v) => { atlasLayer = v; renderAtlas(); });
+$("#atlasSearch").addEventListener("input", renderAtlas);
+renderAtlas();
+
+/* ---------- packages ---------- */
+$("#pkTable").innerHTML = `<thead><tr><th>Module</th><th>.NET (NuGet)</th><th>JavaScript (npm)</th><th>Python (PyPI)</th></tr></thead><tbody>${LAYERS.map((l) => {
+  const rows = MODULES.filter((m) => m.L === l.id && m.pk && Object.keys(m.pk).length);
+  if (!rows.length) return "";
+  return `<tr class="grp" style="--c:var(${l.c})"><td colspan="4">${esc(l.n)}</td></tr>` + rows.map((m) => `<tr><td>${esc(m.n)}</td>${LANG.map(([k]) => { const v = m.pk[k]; return `<td>${v && v !== "—" ? `<code>${esc(v)}</code>` : '<span class="na">—</span>'}</td>`; }).join("")}</tr>`).join("");
+}).join("")}</tbody>`;
+
+/* ---------- ecosystem + roadmap ---------- */
+$("#eco").innerHTML = ECO.map((e) => `<div class="card eco" style="--c:var(${e.c})"><span class="tag" ${tagStyle(e.c)}>${esc(e.tag)}</span><h3>${esc(e.t)}</h3><p>${esc(e.p)}</p></div>`).join("");
+$("#road").innerHTML = ROAD.map(([t, s, m], i) => `<div class="rd"><div class="n">${i + 1}</div><div><b>${esc(t)}</b><span>${esc(s)}</span><div class="chips-row">${m.map(chip).join("")}</div></div></div>`).join("");
+$("#sources").innerHTML = SOURCES.map(([t, u]) => `<li><a href="${esc(u)}" target="_blank" rel="noopener">${esc(t)}</a></li>`).join("");
+
+UI.init();
+UI.onTheme(() => sizeNodes());
+
+</script>
+</body>
+</html>
